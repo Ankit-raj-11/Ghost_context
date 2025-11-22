@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
-import { ConnectButton } from "@mysten/dapp-kit";
 import { Transaction, Inputs } from "@mysten/sui/transactions";
 import "./Marketplace.css";
 
@@ -212,23 +211,11 @@ const Marketplace = () => {
 
   return (
     <div className="marketplace-container">
-      <header className="marketplace-header">
-        <div className="header-content">
-          <div>
-            <h1>🌐 GhostContext Marketplace</h1>
-            <p>Browse and access encrypted knowledge contexts</p>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <a href="/my-purchases" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.2)', borderRadius: '8px' }}>
-              📚 My Purchases
-            </a>
-            <a href="/" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.2)', borderRadius: '8px' }}>
-              🏠 Home
-            </a>
-            <ConnectButton />
-          </div>
+      <div className="page-container">
+        <div className="page-header">
+          <h1 className="page-title">🌐 GhostContext Marketplace</h1>
+          <p className="page-subtitle">Browse and access encrypted knowledge contexts</p>
         </div>
-      </header>
 
       <div className="marketplace-content">
         <aside className="marketplace-sidebar">
@@ -334,6 +321,7 @@ const Marketplace = () => {
             </div>
           )}
         </main>
+      </div>
       </div>
     </div>
   );

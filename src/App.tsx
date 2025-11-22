@@ -1,23 +1,39 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Navbar } from './components/Navbar';
 import Home from './components/Home';
 import Marketplace from './components/Marketplace';
 import MyPurchases from './components/MyPurchases';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import CookiePolicy from './components/CookiePolicy';
-import WalrusTest from './components/WalrusTest';
+import LandingPage from './components/landingPage';
+import './theme.css';
 import './App.css';
+
+function AppContent() {
+  const location = useLocation();
+  const isLandingPage = location.pathname === '/';
+
+  return (
+    <div className="app-layout">
+      {!isLandingPage && <Navbar />}
+      <main className={`app-main ${!isLandingPage ? 'app-main-with-nav' : ''}`}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/my-purchases" element={<MyPurchases />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
 
 function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/marketplace" element={<Marketplace />} />
-        <Route path="/my-purchases" element={<MyPurchases />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/cookie-policy" element={<CookiePolicy />} />
-        <Route path="/walrus-test" element={<WalrusTest />} />
-      </Routes>
+      <AppContent />
     </Router>
   );
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
-import { ConnectButton } from "@mysten/dapp-kit";
 import { useNavigate } from "react-router-dom";
 import { decryptData } from "../ghostcontext/crypto";
 import { fetchFromWalrusBytes } from "../ghostcontext/walrus";
@@ -162,12 +161,12 @@ const MyPurchases = () => {
   if (!currentAccount) {
     return (
       <div className="purchases-container">
-        <header className="purchases-header">
-          <h1>📚 My Purchases</h1>
-          <ConnectButton />
-        </header>
-        <div className="purchases-empty">
-          <p>Please connect your wallet to view your purchases.</p>
+        <div className="page-container">
+          <div className="empty-state">
+            <div className="empty-state-icon">🔒</div>
+            <h2 className="empty-state-title">Wallet Not Connected</h2>
+            <p className="empty-state-text">Please connect your wallet to view your purchases.</p>
+          </div>
         </div>
       </div>
     );
@@ -175,15 +174,13 @@ const MyPurchases = () => {
 
   return (
     <div className="purchases-container">
-      <header className="purchases-header">
-        <div className="header-content">
-          <h1>📚 My Purchases</h1>
-          <p>Your purchased GhostContext access</p>
-          <ConnectButton />
+      <div className="page-container">
+        <div className="page-header">
+          <h1 className="page-title">📚 My Purchases</h1>
+          <p className="page-subtitle">Your purchased GhostContext access</p>
         </div>
-      </header>
 
-      <div className="purchases-content">
+        <div className="purchases-content">
         {loading ? (
           <div className="loading-state">
             <div className="spinner"></div>
@@ -248,6 +245,7 @@ const MyPurchases = () => {
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

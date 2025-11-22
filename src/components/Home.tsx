@@ -23,7 +23,6 @@ import {
   createGhostContextPayload,
   type GhostContextPayload,
 } from "../services/ghostcontext-payload";
-import { VERSION } from "../version";
 import "./Home.css";
 
 interface ChatMessage {
@@ -61,7 +60,6 @@ const Home = () => {
     null
   );
   const [walrusBlobId, setWalrusBlobId] = useState("");
-  const [policyId, setPolicyId] = useState("");
   const [ghostStatus, setGhostStatus] = useState("");
   const [isEncrypting, setIsEncrypting] = useState(false);
   const [encryptionMetadata, setEncryptionMetadata] = useState<EncryptedMetadata | null>(
@@ -107,7 +105,6 @@ const Home = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   // UI State
-  const [showSetupSection, setShowSetupSection] = useState(true);
   const [shouldStopGeneration, setShouldStopGeneration] = useState(false);
 
   // Refs for services
@@ -453,7 +450,6 @@ const Home = () => {
       
       setEncryptionMetadata(metadata);
       setWalrusBlobId(metadata.walrusBlobId);
-      setPolicyId(currentAccount.address);
       
       setGhostPayload({
         ...ghostPayload,
@@ -510,7 +506,6 @@ const Home = () => {
       await ingestGhostPayload(payload);
       setGhostPayload(payload);
       setWalrusBlobId(remoteBlobId.trim());
-      setPolicyId(payload.policyId || currentAccount.address);
       
       showToastNotification(
         `GhostContext "${payload.fileName}" loaded successfully!`,
@@ -675,7 +670,6 @@ const Home = () => {
         );
         setContextTitle(file.name.replace(/\.[^/.]+$/, ""));
         setWalrusBlobId("");
-        setPolicyId("");
         setMintedContextId("");
         setContextSharedVersion(null);
         setUploadProgress(30);
@@ -865,6 +859,18 @@ const Home = () => {
     }, 100);
   };
 
+  // Auto-scroll when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages, answer]);
+
+  // Auto-resize textarea
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setQuestion(e.target.value);
+    e.target.style.height = '48px';
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+  };
+
   const stopGeneration = () => {
     setShouldStopGeneration(true);
     console.log("⏹️ Stop generation requested");
@@ -890,9 +896,22 @@ const Home = () => {
 
   return (
     <main className="main">
-      <div className="container">
-        <h1>🍕 WebPizza AI/RAG POC</h1>
-        <p className="subtitle">Private Document Chat - 100% Client-Side AI</p>
+      {/* Loading Overlay */}
+      {loading && !showBrowserError && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <div className="loading-spinner"></div>
+            <h2 className="loading-title">Loading AI Models...</h2>
+            <p className="loading-text">{initProgress || "Initializing..."}</p>
+            <div className="progress-container">
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${loadingProgress}%` }}></div>
+              </div>
+              <p className="progress-text">{loadingProgress}%</p>
+            </div>
+          </div>
+        </div>
+      )}
 
         {/* Browser Error Section */}
         {showBrowserError && (
@@ -1046,450 +1065,377 @@ const Home = () => {
           </div>
         )}
 
-        {!loading && (
-          <div className="chat-layout">
-            {/* Collapsible Setup Section */}
-            <div
-              className={`setup-section ${
-                !showSetupSection ? "collapsed" : ""
-              }`}
-            >
-              <button
-                className="toggle-setup-button"
-                onClick={() => setShowSetupSection(!showSetupSection)}
-              >
-                {showSetupSection ? "▼" : "▶"}{" "}
-                {showSetupSection ? "Hide" : "Show"} Setup
-              </button>
+      {/* Browser Error */}
+      {showBrowserError && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <h2 className="loading-title">⚠️ WebGPU Not Available</h2>
+            <p className="loading-text">{browserErrorDetails}</p>
+            <p className="loading-text" style={{ marginTop: 'var(--spacing-lg)' }}>
+              Please enable WebGPU in your browser settings and refresh the page.
+            </p>
+          </div>
+        </div>
+      )}
 
-              {showSetupSection && (
-                <div className="setup-content">
-                  <section className="engine-section card">
-                    <h2>⚡ Engine Selection</h2>
-                    <div className="engine-selector">
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="engine"
-                          value="webllm"
-                          checked={selectedEngine === "webllm"}
-                          onChange={() => onEngineChange("webllm")}
-                          disabled={isModelLoaded}
-                        />
-                        <span className="radio-text">
-                          <strong>WebLLM</strong> (Standard)
-                          <small>Original implementation</small>
-                        </span>
-                      </label>
-                      <label className="radio-label">
-                        <input
-                          type="radio"
-                          name="engine"
-                          value="weinfer"
-                          checked={selectedEngine === "weinfer"}
-                          onChange={() => onEngineChange("weinfer")}
-                          disabled={isModelLoaded}
-                        />
-                        <span className="radio-text">
-                          <strong>WeInfer</strong> (Optimized)
-                          <small>
-                            ⚡ ~3.76x faster with buffer reuse + async pipeline
-                          </small>
-                        </span>
-                      </label>
-                      {!isModelLoaded && (
-                        <p className="hint">
-                          💡 WeInfer offers significant performance improvements
-                          through GPU buffer reuse and asynchronous pipeline
-                          processing.
-                        </p>
-                      )}
-                      {isModelLoaded && (
-                        <p className="hint success">
-                          ✅ Engine:{" "}
-                          {selectedEngine === "weinfer"
-                            ? "WeInfer (Optimized)"
-                            : "WebLLM (Standard)"}
-                        </p>
-                      )}
-                    </div>
-                  </section>
-
-                  <section className="model-section card">
-                    <h2>🤖 Model Selection</h2>
-                    <div className="model-selector">
-                      <label htmlFor="modelSelect">Choose LLM Model:</label>
-                      <select
-                        id="modelSelect"
-                        value={selectedModel}
-                        onChange={(e) => onModelChange(e.target.value)}
-                        disabled={isModelLoaded}
-                        className="model-select"
-                      >
-                        <option value="" disabled>
-                          -- Select an LLM Model --
-                        </option>
-                        {availableModels.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name} - {model.size} ({model.speed},{" "}
-                            {model.quality})
-                          </option>
-                        ))}
-                      </select>
-                      {!isModelLoaded && !selectedModel && (
-                        <p className="hint">
-                          👆 Choose a model to get started. Faster models =
-                          quicker responses but lower quality.
-                        </p>
-                      )}
-                      {!isModelLoaded && selectedModel && (
-                        <p className="hint warning">
-                          ⏳ Initializing model... This may take a few minutes
-                          on first load.
-                        </p>
-                      )}
-                      {isModelLoaded && (
-                        <p className="hint success">
-                          ✅ Model loaded: {getCurrentModelName()}
-                        </p>
-                      )}
-                    </div>
-                  </section>
-
-                  <section className="rag-options-section card">
-                    <h2>⚙️ RAG Options</h2>
-                    <div className="options-grid">
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={enableSourceCitations}
-                          onChange={(e) =>
-                            setEnableSourceCitations(e.target.checked)
-                          }
-                          disabled={querying}
-                        />
-                        <span className="checkbox-text">
-                          <strong>📖 Source Citations</strong>
-                          <small>Show page numbers in answers</small>
-                        </span>
-                      </label>
-
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={enableConversationalMemory}
-                          onChange={(e) =>
-                            setEnableConversationalMemory(e.target.checked)
-                          }
-                          disabled={querying}
-                        />
-                        <span className="checkbox-text">
-                          <strong>💭 Conversational Memory</strong>
-                          <small>
-                            Remember previous questions for follow-ups
-                          </small>
-                        </span>
-                      </label>
-
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={enableHybridSearch}
-                          onChange={(e) =>
-                            setEnableHybridSearch(e.target.checked)
-                          }
-                          disabled={querying}
-                        />
-                        <span className="checkbox-text">
-                          <strong>🔍 Hybrid Search</strong>
-                          <small>
-                            Combine semantic (70%) + keyword (30%) search
-                          </small>
-                        </span>
-                      </label>
-                    </div>
-
-                    {enableConversationalMemory &&
-                      conversationHistory.length > 0 && (
-                        <div className="conversation-info">
-                          <p className="hint">
-                            💭 Conversation: {conversationHistory.length}{" "}
-                            exchange(s)
-                          </p>
-                          <button
-                            className="clear-conversation-button"
-                            onClick={clearConversation}
-                            disabled={querying}
-                          >
-                            🗑️ Clear Conversation
-                          </button>
-                        </div>
-                      )}
-                  </section>
-
-                  <section className="upload-section card">
-                    <h2>📄 Step 1: Upload PDF Document</h2>
-
-                    {!isModelLoaded && (
-                      <div className="hint warning">
-                        ⚠️ Please select and load a model first before uploading
-                        documents.
-                      </div>
-                    )}
-
-                    {!uploading && !loadedDocumentName && isModelLoaded && (
-                      <div className="upload-area">
-                        <input
-                          type="file"
-                          id="fileInput"
-                          accept=".pdf"
-                          onChange={onFileUpload}
-                          disabled={uploading || !isModelLoaded}
-                        />
-                        <label
-                          htmlFor="fileInput"
-                          className={`upload-button ${
-                            uploading || !isModelLoaded ? "disabled" : ""
-                          }`}
-                        >
-                          📎 Choose PDF File
-                        </label>
-                      </div>
-                    )}
-
-                    {uploading && (
-                      <div className="upload-progress">
-                        <h3>📄 Processing: {uploadFileName}</h3>
-                        <div className="progress-container">
-                          <div className="progress-bar">
-                            <div
-                              className="progress-fill"
-                              style={{ width: `${uploadProgress}%` }}
-                            ></div>
-                          </div>
-                          <div className="progress-percentage">
-                            {uploadProgress}%
-                          </div>
-                        </div>
-                        <p className="progress-text">{uploadStatus}</p>
-                      </div>
-                    )}
-
-                    {!uploading && loadedDocumentName && (
-                      <div className="loaded-document">
-                        <div className="document-info">
-                          <span className="document-icon">📄</span>
-                          <span className="document-name">
-                            {loadedDocumentName}
-                          </span>
-                        </div>
-                        <button
-                          className="change-document-button"
-                          onClick={() => {
-                            setLoadedDocumentName("");
-                            setGhostPayload(null);
-                            setWalrusBlobId("");
-                            setPolicyId("");
-                            setMintedContextId("");
-                            setContextSharedVersion(null);
-                          }}
-                          title="Upload a different document"
-                        >
-                          🔄 Change Document
-                        </button>
-                      </div>
-                    )}
-
-                    <p className="hint">
-                      💡 Your document stays 100% local - never sent to any
-                      server
-                    </p>
-                  </section>
-
-                  <section className="wallet-section card">
-                    <div className="wallet-bar">
-                      <div>
-                        <h2>🔐 Wallet & Access Control</h2>
-                        <p className="hint">
-                          Connect your Sui wallet (testnet) to mint NFTs and
-                          decrypt Walrus blobs.
-                        </p>
-                      </div>
-                      <ConnectButton />
-                    </div>
-                    {currentAccount ? (
-                      <p className="hint success">
-                        Connected: {currentAccount.address.slice(0, 6)}...
-                        {currentAccount.address.slice(-4)}
-                      </p>
-                    ) : (
-                      <p className="hint warning">
-                        Wallet disconnected. Connect to unlock GhostContext
-                        features.
-                      </p>
-                    )}
-                  </section>
-
-                  <section className="ghostcontext-section card">
-                    <h2>🛡️ GhostContext Vault</h2>
-                    <p className="hint">
-                      Seal encrypt the parsed chunks, upload to Walrus, and
-                      register ownership on Sui.
-                    </p>
-                    <div className="context-input-grid">
-                      <label className="context-field">
-                        <span>Context Title</span>
-                        <input
-                          type="text"
-                          value={contextTitle}
-                          onChange={(e) => setContextTitle(e.target.value)}
-                          placeholder="e.g. Ferrari Engine Manual"
-                        />
-                      </label>
-                      <label className="context-field">
-                        <span>Category</span>
-                        <input
-                          type="text"
-                          value={contextCategory}
-                          onChange={(e) => setContextCategory(e.target.value)}
-                          placeholder="General"
-                        />
-                      </label>
-                      <label className="context-field">
-                        <span>Price Per Query (in MIST)</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={pricePerQuery}
-                          onChange={(e) => setPricePerQuery(e.target.value)}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="ghost-buttons">
-                      <button
-                        className="ghost-action primary"
-                        onClick={handleEncryptAndUpload}
-                        disabled={
-                          !ghostPayload || !currentAccount || isEncrypting
-                        }
-                      >
-                        {isEncrypting
-                          ? "Encrypting..."
-                          : "Seal Encrypt + Upload"}
-                      </button>
-                      <button
-                        className="ghost-action"
-                        onClick={handleMintContext}
-                        disabled={!walrusBlobId || !currentAccount || isMinting}
-                      >
-                        {isMinting ? "Minting..." : "Mint Context NFT"}
-                      </button>
-                      <button
-                        className="ghost-action secondary"
-                        onClick={handleListContext}
-                        disabled={!mintedContextId || !contextSharedVersion}
-                      >
-                        List Context
-                      </button>
-                    </div>
-
-                    {(ghostStatus || walrusBlobId || mintedContextId) && (
-                      <div className="ghostcontext-status">
-                        {ghostStatus && <p>{ghostStatus}</p>}
-                        {walrusBlobId && (
-                          <p>
-                            Walrus Blob:{" "}
-                            <span className="ghost-id-pill">
-                              {walrusBlobId}
-                            </span>
-                          </p>
-                        )}
-                        {policyId && (
-                          <p>
-                            Seal Policy:{" "}
-                            <span className="ghost-id-pill">{policyId}</span>
-                          </p>
-                        )}
-                        {mintedContextId && (
-                          <p>
-                            Context NFT:{" "}
-                            <span className="ghost-id-pill">
-                              {mintedContextId}
-                            </span>
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="ghostcontext-access card">
-                    <h2>📥 Load from Walrus</h2>
-                    <div className="ghost-access-grid">
-                      <div className="context-field">
-                        <span>Walrus Blob ID</span>
-                        <input
-                          type="text"
-                          value={remoteBlobId}
-                          onChange={(e) => setRemoteBlobId(e.target.value)}
-                          placeholder="Enter Walrus blob ID"
-                        />
-                      </div>
-                      <button
-                        className="ghost-action secondary"
-                        onClick={handleLoadFromWalrus}
-                        disabled={
-                          !remoteBlobId || !encryptionMetadata || isLoadingRemote
-                        }
-                      >
-                        {isLoadingRemote ? "Loading..." : "Load into RAG"}
-                      </button>
-                    </div>
-                    {encryptionMetadata && (
-                      <p className="hint success">
-                        Encryption metadata available. You can decrypt data from this session.
-                      </p>
-                    )}
-                  </section>
+      {/* Main 2-Column Layout */}
+      {!loading && !showBrowserError && (
+        <div className="home-layout">
+          {/* LEFT COLUMN - Controls & Settings */}
+          <div className="home-controls">
+            {/* Engine Selection */}
+            <div className="controls-section">
+              <div className="section-header">
+                <div className="section-icon">⚡</div>
+                <h2 className="section-title">Engine Selection</h2>
+              </div>
+              <div className="option-group">
+                <label className={`option-item ${selectedEngine === "webllm" ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="engine"
+                    value="webllm"
+                    checked={selectedEngine === "webllm"}
+                    onChange={() => onEngineChange("webllm")}
+                    disabled={isModelLoaded}
+                    className="option-radio"
+                  />
+                  <div className="option-content">
+                    <div className="option-title">WebLLM (Standard)</div>
+                    <div className="option-description">Original implementation</div>
+                  </div>
+                </label>
+                <label className={`option-item ${selectedEngine === "weinfer" ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="engine"
+                    value="weinfer"
+                    checked={selectedEngine === "weinfer"}
+                    onChange={() => onEngineChange("weinfer")}
+                    disabled={isModelLoaded}
+                    className="option-radio"
+                  />
+                  <div className="option-content">
+                    <div className="option-title">WeInfer (Optimized)</div>
+                    <div className="option-description">⚡ ~3.76x faster with buffer reuse</div>
+                  </div>
+                </label>
+              </div>
+              {isModelLoaded && (
+                <div className="status-badge" style={{ marginTop: 'var(--spacing-md)' }}>
+                  ✅ Engine: {selectedEngine === "weinfer" ? "WeInfer" : "WebLLM"}
                 </div>
               )}
             </div>
 
-            {/* Toast Notification */}
-            {showToast && (
-              <div
-                className={`toast ${
-                  toastType === "success" ? "success" : "error"
-                }`}
-              >
-                <span className="toast-icon">
-                  {toastType === "success" ? "✅" : "❌"}
-                </span>
-                <span className="toast-message">{toastMessage}</span>
+            {/* Model Selection */}
+            <div className="controls-section">
+              <div className="section-header">
+                <div className="section-icon">🤖</div>
+                <h2 className="section-title">Model Selection</h2>
+              </div>
+              <div className="form-group">
+                <label htmlFor="modelSelect" className="form-label">Choose LLM Model:</label>
+                <select
+                  id="modelSelect"
+                  value={selectedModel}
+                  onChange={(e) => onModelChange(e.target.value)}
+                  disabled={isModelLoaded}
+                  className="form-select"
+                >
+                  <option value="" disabled>-- Select an LLM Model --</option>
+                  {availableModels.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} - {model.size} ({model.speed}, {model.quality})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isModelLoaded && (
+                <div className="status-badge">
+                  ✅ Model loaded: {getCurrentModelName()}
+                </div>
+              )}
+            </div>
+
+            {/* RAG Options */}
+            <div className="controls-section">
+              <div className="section-header">
+                <div className="section-icon">⚙️</div>
+                <h2 className="section-title">RAG Options</h2>
+              </div>
+              <div className="option-group">
+                <label className="option-item">
+                  <input
+                    type="checkbox"
+                    checked={enableSourceCitations}
+                    onChange={(e) => setEnableSourceCitations(e.target.checked)}
+                    disabled={querying}
+                    className="option-checkbox"
+                  />
+                  <div className="option-content">
+                    <div className="option-title">📖 Source Citations</div>
+                    <div className="option-description">Show page numbers in answers</div>
+                  </div>
+                </label>
+                <label className="option-item">
+                  <input
+                    type="checkbox"
+                    checked={enableConversationalMemory}
+                    onChange={(e) => setEnableConversationalMemory(e.target.checked)}
+                    disabled={querying}
+                    className="option-checkbox"
+                  />
+                  <div className="option-content">
+                    <div className="option-title">💭 Conversational Memory</div>
+                    <div className="option-description">Remember previous questions</div>
+                  </div>
+                </label>
+                <label className="option-item">
+                  <input
+                    type="checkbox"
+                    checked={enableHybridSearch}
+                    onChange={(e) => setEnableHybridSearch(e.target.checked)}
+                    disabled={querying}
+                    className="option-checkbox"
+                  />
+                  <div className="option-content">
+                    <div className="option-title">🔍 Hybrid Search</div>
+                    <div className="option-description">Semantic + keyword search</div>
+                  </div>
+                </label>
+              </div>
+              {enableConversationalMemory && conversationHistory.length > 0 && (
+                <button
+                  className="btn-control-secondary"
+                  onClick={clearConversation}
+                  disabled={querying}
+                  style={{ marginTop: 'var(--spacing-md)' }}
+                >
+                  🗑️ Clear Conversation ({conversationHistory.length})
+                </button>
+              )}
+            </div>
+
+            {/* Document Upload */}
+            <div className="controls-section">
+              <div className="section-header">
+                <div className="section-icon">📄</div>
+                <h2 className="section-title">Upload Document</h2>
+              </div>
+              <p className="section-description">
+                Upload a PDF document to chat with using AI
+              </p>
+
+              {!uploading && !loadedDocumentName && isModelLoaded && (
+                <label htmlFor="fileInput" className="upload-area">
+                  <input
+                    type="file"
+                    id="fileInput"
+                    accept=".pdf"
+                    onChange={onFileUpload}
+                    disabled={uploading || !isModelLoaded}
+                  />
+                  <div className="upload-icon">📎</div>
+                  <p className="upload-text">Click to choose PDF file</p>
+                  <p className="upload-hint">100% local - never sent to any server</p>
+                </label>
+              )}
+
+              {!isModelLoaded && (
+                <div className="upload-area" style={{ cursor: 'not-allowed', opacity: 0.6 }}>
+                  <div className="upload-icon">⚠️</div>
+                  <p className="upload-text">Load a model first</p>
+                </div>
+              )}
+
+              {uploading && (
+                <div>
+                  <p style={{ marginBottom: 'var(--spacing-md)', fontWeight: 'var(--font-medium)' }}>
+                    📄 Processing: {uploadFileName}
+                  </p>
+                  <div className="progress-container">
+                    <div className="progress-bar">
+                      <div className="progress-fill" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                    <p className="progress-text">{uploadStatus}</p>
+                  </div>
+                </div>
+              )}
+
+              {!uploading && loadedDocumentName && (
+                <div>
+                  <div className="status-badge" style={{ marginBottom: 'var(--spacing-md)' }}>
+                    ✅ Loaded: {loadedDocumentName}
+                  </div>
+                  <button
+                    className="btn-control-secondary"
+                    onClick={() => {
+                      setLoadedDocumentName("");
+                      setGhostPayload(null);
+                      setWalrusBlobId("");
+                      setMintedContextId("");
+                      setContextSharedVersion(null);
+                    }}
+                  >
+                    🔄 Change Document
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Wallet Connection */}
+            <div className="controls-section">
+              <div className="section-header">
+                <div className="section-icon">🔐</div>
+                <h2 className="section-title">Wallet & Access</h2>
+              </div>
+              <p className="section-description">
+                Connect your Sui wallet to mint NFTs and access encrypted content
+              </p>
+              <ConnectButton />
+              {currentAccount && (
+                <div className="status-badge" style={{ marginTop: 'var(--spacing-md)' }}>
+                  ✅ Connected: {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
+                </div>
+              )}
+            </div>
+
+            {/* GhostContext Vault */}
+            {ghostPayload && currentAccount && (
+              <div className="controls-section">
+                <div className="section-header">
+                  <div className="section-icon">🛡️</div>
+                  <h2 className="section-title">GhostContext Vault</h2>
+                </div>
+                <p className="section-description">
+                  Encrypt, upload to Walrus, and mint as NFT
+                </p>
+                
+                <div className="form-group">
+                  <label className="form-label">Context Title</label>
+                  <input
+                    type="text"
+                    value={contextTitle}
+                    onChange={(e) => setContextTitle(e.target.value)}
+                    placeholder="e.g. Ferrari Engine Manual"
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Category</label>
+                  <input
+                    type="text"
+                    value={contextCategory}
+                    onChange={(e) => setContextCategory(e.target.value)}
+                    placeholder="General"
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Price Per Query (MIST)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={pricePerQuery}
+                    onChange={(e) => setPricePerQuery(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+
+                <button
+                  className="btn-control"
+                  onClick={handleEncryptAndUpload}
+                  disabled={isEncrypting}
+                  style={{ marginBottom: 'var(--spacing-sm)' }}
+                >
+                  {isEncrypting ? "Encrypting..." : "🔐 Encrypt & Upload"}
+                </button>
+
+                {walrusBlobId && (
+                  <>
+                    <button
+                      className="btn-control"
+                      onClick={handleMintContext}
+                      disabled={isMinting}
+                      style={{ marginBottom: 'var(--spacing-sm)' }}
+                    >
+                      {isMinting ? "Minting..." : "🪙 Mint NFT"}
+                    </button>
+
+                    {mintedContextId && contextSharedVersion && (
+                      <button
+                        className="btn-control"
+                        onClick={handleListContext}
+                      >
+                        📢 List for Sale
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {ghostStatus && (
+                  <div className="status-badge loading" style={{ marginTop: 'var(--spacing-md)' }}>
+                    {ghostStatus}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Chat Area */}
-            <div className="chat-section">
-              <div className="chat-container" ref={chatContainerRef}>
-                {chatMessages.length === 0 && (
-                  <div className="chat-empty-state">
-                    <div className="empty-icon">💬</div>
-                    <h3>Ready to chat!</h3>
-                    <p>Upload a PDF document and start asking questions.</p>
-                  </div>
-                )}
+            {/* Load from Walrus */}
+            {encryptionMetadata && (
+              <div className="controls-section">
+                <div className="section-header">
+                  <div className="section-icon">📥</div>
+                  <h2 className="section-title">Load from Walrus</h2>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Walrus Blob ID</label>
+                  <input
+                    type="text"
+                    value={remoteBlobId}
+                    onChange={(e) => setRemoteBlobId(e.target.value)}
+                    placeholder="Enter Walrus blob ID"
+                    className="form-input"
+                  />
+                </div>
+                <button
+                  className="btn-control"
+                  onClick={handleLoadFromWalrus}
+                  disabled={!remoteBlobId || isLoadingRemote}
+                >
+                  {isLoadingRemote ? "Loading..." : "📥 Load into RAG"}
+                </button>
+              </div>
+            )}
+          </div>
 
+          {/* RIGHT COLUMN - Chat Interface */}
+          <div className="home-chat">
+            {/* Chat Header */}
+            <div className="chat-header">
+              <h2 className="chat-header-title">💬 AI Chat</h2>
+              <p className="chat-header-subtitle">
+                {loadedDocumentName ? `Chatting with: ${loadedDocumentName}` : "Upload a document to start chatting"}
+              </p>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="chat-messages-container" ref={chatContainerRef}>
+              {chatMessages.length === 0 ? (
+                <div className="chat-empty-state">
+                  <div className="chat-empty-icon">💬</div>
+                  <h3 className="chat-empty-title">Ready to chat!</h3>
+                  <p className="chat-empty-text">Upload a PDF document and start asking questions.</p>
+                </div>
+              ) : (
                 <div className="chat-messages">
                   {chatMessages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`message-wrapper ${
-                        message.role === "user" ? "user" : "assistant"
-                      }`}
-                    >
+                    <div key={index} className={`message-wrapper ${message.role}`}>
                       <div className="message-bubble">
-                        <div className="message-content">{message.content}</div>
+                        <p className="message-content">{message.content}</p>
                         <div className="message-meta">
                           <span className="message-time">
                             {message.timestamp.toLocaleTimeString("en-US", {
@@ -1507,118 +1453,73 @@ const Home = () => {
                     </div>
                   ))}
 
-                  {/* Typing indicator */}
                   {querying && (
                     <div className="message-wrapper assistant">
-                      <div className="message-bubble typing">
+                      <div className="message-bubble">
                         <div className="typing-indicator">
-                          <span></span>
-                          <span></span>
-                          <span></span>
+                          <div className="typing-dot"></div>
+                          <div className="typing-dot"></div>
+                          <div className="typing-dot"></div>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-              </div>
+              )}
+            </div>
 
-              {/* Fixed Input at Bottom */}
-              <div className="chat-input-container">
-                <div className="chat-input-wrapper">
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="Ask a question about your document..."
-                    disabled={querying || !loadedDocumentName}
-                    onKeyUp={(e) => e.key === "Enter" && onQuery()}
-                    className="chat-input"
-                  />
-                  {!querying && (
-                    <button
-                      onClick={onQuery}
-                      disabled={!question.trim() || !loadedDocumentName}
-                      className="send-button"
-                      title={
-                        !loadedDocumentName
-                          ? "Upload a PDF first"
-                          : "Send message"
-                      }
-                    >
-                      ➤
-                    </button>
-                  )}
-                  {querying && (
-                    <button
-                      onClick={stopGeneration}
-                      className="stop-button"
-                      title="Stop generation"
-                    >
-                      ⏹
-                    </button>
-                  )}
-                </div>
+            {/* Chat Input */}
+            <div className="chat-input-container">
+              <div className="chat-input-wrapper">
+                <textarea
+                  value={question}
+                  onChange={handleTextareaChange}
+                  placeholder="Ask a question about your document..."
+                  disabled={querying || !loadedDocumentName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onQuery();
+                      e.currentTarget.style.height = '48px';
+                    }
+                  }}
+                  className="chat-input"
+                  rows={1}
+                />
+                {!querying ? (
+                  <button
+                    onClick={onQuery}
+                    disabled={!question.trim() || !loadedDocumentName}
+                    className="chat-send-btn"
+                    title={!loadedDocumentName ? "Upload a PDF first" : "Send message"}
+                  >
+                    ➤
+                  </button>
+                ) : (
+                  <button
+                    onClick={stopGeneration}
+                    className="chat-send-btn chat-stop-btn"
+                    title="Stop generation"
+                  >
+                    ⏹
+                  </button>
+                )}
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <footer className="footer">
-          <section className="tech-info">
-            <p>
-              <strong>Tech Stack:</strong> React 18 + Vite + WebLLM/WeInfer +
-              Transformers.js + PDF.js + IndexedDB + WebGPU
-            </p>
-            <p>
-              <strong>Privacy:</strong> 100% client-side - all processing
-              happens in your browser via WebGPU/WASM
-            </p>
-          </section>
-
-          <div className="footer-content">
-            <div className="footer-links">
-              <a href="/privacy-policy" className="footer-link">
-                Privacy Policy
-              </a>
-              <span className="footer-separator">•</span>
-              <a href="/cookie-policy" className="footer-link">
-                Cookie Policy
-              </a>
-            </div>
-            <div className="footer-credits">
-              Made with <span className="heart">❤️</span> by
-              <a
-                href="https://emanuelestrazzullo.dev/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="author-link"
-              >
-                Emanuele Strazzullo
-              </a>
-              <span className="footer-separator">•</span>
-              <a
-                href="https://www.linkedin.com/in/emanuelestrazzullo/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="social-link"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
-                </svg>
-                LinkedIn
-              </a>
-            </div>
-            <div className="footer-version">v{VERSION}</div>
-          </div>
-        </footer>
-      </div>
+      {/* Toast Notification */}
+      {showToast && (
+        <div className={`toast ${toastType}`}>
+          <span className="toast-icon">{toastType === "success" ? "✅" : "❌"}</span>
+          <span className="toast-message">{toastMessage}</span>
+        </div>
+      )}
     </main>
   );
 };
 
 export default Home;
+

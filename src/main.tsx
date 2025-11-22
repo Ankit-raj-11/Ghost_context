@@ -7,7 +7,15 @@ import App from './App.tsx';
 import './index.css';
 import '@mysten/dapp-kit/dist/index.css';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000, // 1 minute
+      gcTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
+
 const { networkConfig } = createNetworkConfig({
   testnet: { url: getFullnodeUrl('testnet') },
 });
@@ -16,7 +24,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-        <WalletProvider>
+        <WalletProvider autoConnect={true} storageKey="ghostcontext-wallet">
           <App />
         </WalletProvider>
       </SuiClientProvider>
