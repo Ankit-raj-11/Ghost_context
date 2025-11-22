@@ -28,6 +28,8 @@ module ghostcontext::ghostcontext {
         id: UID,
         title: String,
         walrus_blob_id: String,
+        encryption_key: String,
+        iv: String,
         owner: address,
         is_listed: bool,
         price_per_query: u64,
@@ -41,6 +43,8 @@ module ghostcontext::ghostcontext {
         id: UID,
         context_id: address,
         walrus_blob_id: String,
+        encryption_key: String,
+        iv: String,
         queries_purchased: u64,
         queries_remaining: u64,
         purchased_at: u64,
@@ -101,10 +105,12 @@ module ghostcontext::ghostcontext {
 
     //  Core Functions
 
-    /// 1. Create and share a new context
+    /// 1. Create and share a new context (with encryption key for Option A)
     public entry fun create_context(
         title: vector<u8>,
         walrus_blob_id: vector<u8>,
+        encryption_key: vector<u8>,
+        iv: vector<u8>,
         category: vector<u8>,
         registry: &mut MarketplaceRegistry,
         ctx: &mut TxContext
@@ -117,6 +123,8 @@ module ghostcontext::ghostcontext {
             id,
             title: string::utf8(title),
             walrus_blob_id: string::utf8(walrus_blob_id),
+            encryption_key: string::utf8(encryption_key),
+            iv: string::utf8(iv),
             owner: sender,
             is_listed: false,
             price_per_query: 0,
@@ -221,13 +229,15 @@ module ghostcontext::ghostcontext {
         // Send payment to owner
         transfer::public_transfer(payment, nft.owner);
 
-        // Mint receipt for buyer
+        // Mint receipt for buyer (includes encryption key for decryption)
         let buyer = tx_context::sender(ctx);
         let receipt_id = object::new(ctx);
         let receipt = QueryReceipt {
             id: receipt_id,
             context_id: object::uid_to_address(&nft.id),
             walrus_blob_id: nft.walrus_blob_id,
+            encryption_key: nft.encryption_key,
+            iv: nft.iv,
             queries_purchased: queries_to_buy,
             queries_remaining: queries_to_buy,
             purchased_at: tx_context::epoch(ctx),

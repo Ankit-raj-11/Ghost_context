@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { ConnectButton } from "@mysten/dapp-kit";
+import { Transaction, Inputs } from "@mysten/sui/transactions";
 import "./Marketplace.css";
 
 interface GhostContextNFT {
   id: string;
   title: string;
   walrusBlobId: string;
+  encryptionKey: string;
+  iv: string;
   category: string;
   owner: string;
   version: string;
@@ -18,14 +21,116 @@ const Marketplace = () => {
   const [contexts, setContexts] = useState<GhostContextNFT[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
+  const [purchasing, setPurchasing] = useState<string | null>(null);
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
+  const signAndExecuteTransaction = useSignAndExecuteTransaction({
+    mutationKey: ["marketplace-purchase"],
+  });
 
   const ghostContextPackageId = import.meta.env.VITE_GHOSTCONTEXT_PACKAGE_ID as string | undefined;
+  const registryObjectId = import.meta.env.VITE_GHOSTCONTEXT_REGISTRY_ID as string | undefined;
 
   useEffect(() => {
     loadMarketplace();
   }, []);
+
+  const handlePurchaseAccess = async (context: GhostContextNFT) => {
+    if (!currentAccount) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    if (!ghostContextPackageId || !registryObjectId) {
+      alert("Missing contract configuration");
+      return;
+    }
+
+    const queries = prompt("How many queries would you like to purchase?", "10");
+    if (!queries || isNaN(parseInt(queries))) return;
+
+    const queryCount = parseInt(queries);
+    const pricePerQueryNum = parseInt(context.pricePerQuery || "0");
+    const totalCost = pricePerQueryNum * queryCount;
+    const totalPrice = totalCost / 1_000_000_000; // Convert MIST to SUI
+
+    if (!confirm(`Purchase ${queryCount} queries for ${totalPrice.toFixed(4)} SUI?`)) {
+      return;
+    }
+
+    try {
+      setPurchasing(context.id);
+      console.log("🛒 Purchasing access to:", context.title);
+
+      // Get registry shared version
+      const registryObj = await suiClient.getObject({
+        id: registryObjectId,
+        options: { showOwner: true },
+      });
+      const registrySharedVersion = (registryObj.data?.owner as any)?.Shared?.initial_shared_version;
+
+      if (!registrySharedVersion) {
+        throw new Error("Could not get registry shared version");
+      }
+
+      // Get fresh context object to get current shared version
+      const contextObj = await suiClient.getObject({
+        id: context.id,
+        options: { showOwner: true },
+      });
+      
+      const contextSharedVersion = (contextObj.data?.owner as any)?.Shared?.initial_shared_version;
+      console.log("Context shared version:", contextSharedVersion);
+
+      if (!contextSharedVersion) {
+        throw new Error("Could not get context shared version");
+      }
+
+      // Build transaction
+      const tx = new Transaction();
+      
+      const contextArg = Inputs.SharedObjectRef({
+        objectId: context.id,
+        initialSharedVersion: contextSharedVersion,
+        mutable: true,
+      });
+
+      const registryArg = Inputs.SharedObjectRef({
+        objectId: registryObjectId,
+        initialSharedVersion: registrySharedVersion,
+        mutable: true,
+      });
+
+      // Split coins for payment
+      const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(totalCost)]);
+
+      tx.moveCall({
+        target: `${ghostContextPackageId}::ghostcontext::purchase_queries`,
+        arguments: [
+          tx.object(contextArg),
+          tx.pure.u64(queryCount),
+          coin,
+          tx.object(registryArg),
+        ],
+      });
+
+      const response = await signAndExecuteTransaction.mutateAsync({
+        transaction: tx,
+        chain: "sui:testnet",
+      });
+
+      console.log("✅ Purchase successful:", response.digest);
+      alert(`Purchase successful! You now have ${queryCount} queries. Check your wallet for the QueryReceipt NFT with encryption keys.`);
+      
+      // Reload marketplace to update stats
+      await loadMarketplace();
+    } catch (error: any) {
+      console.error("Purchase failed:", error);
+      alert(`Purchase failed: ${error.message || "Unknown error"}`);
+    } finally {
+      setPurchasing(null);
+    }
+  };
 
   const loadMarketplace = async () => {
     if (!ghostContextPackageId) {
@@ -65,15 +170,20 @@ const Marketplace = () => {
 
           if (nftObject.data?.content?.dataType === "moveObject") {
             const fields = (nftObject.data.content as any).fields;
+            
+            console.log(`Context ${contextId} fields:`, fields);
+            
             return {
               id: contextId,
               title: fields.title,
               walrusBlobId: fields.walrus_blob_id,
+              encryptionKey: fields.encryption_key || "",
+              iv: fields.iv || "",
               category: fields.category,
               owner: fields.owner,
               version: nftObject.data.version || "1",
               isListed: fields.is_listed,
-              pricePerQuery: fields.price_per_query,
+              pricePerQuery: fields.price_per_query?.toString() || "0",
             };
           }
         } catch (error) {
@@ -104,9 +214,19 @@ const Marketplace = () => {
     <div className="marketplace-container">
       <header className="marketplace-header">
         <div className="header-content">
-          <h1>🌐 GhostContext Marketplace</h1>
-          <p>Browse and access encrypted knowledge contexts</p>
-          <ConnectButton />
+          <div>
+            <h1>🌐 GhostContext Marketplace</h1>
+            <p>Browse and access encrypted knowledge contexts</p>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <a href="/my-purchases" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.2)', borderRadius: '8px' }}>
+              📚 My Purchases
+            </a>
+            <a href="/" style={{ color: 'white', textDecoration: 'none', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.2)', borderRadius: '8px' }}>
+              🏠 Home
+            </a>
+            <ConnectButton />
+          </div>
         </div>
       </header>
 
@@ -195,9 +315,13 @@ const Marketplace = () => {
                       <button className="btn-secondary" disabled>
                         You Own This
                       </button>
-                    ) : context.isListed ? (
-                      <button className="btn-primary">
-                        Purchase Access
+                    ) : context.isListed && context.pricePerQuery ? (
+                      <button 
+                        className="btn-primary"
+                        onClick={() => handlePurchaseAccess(context)}
+                        disabled={purchasing === context.id}
+                      >
+                        {purchasing === context.id ? "Purchasing..." : "Purchase Access"}
                       </button>
                     ) : (
                       <button className="btn-secondary" disabled>

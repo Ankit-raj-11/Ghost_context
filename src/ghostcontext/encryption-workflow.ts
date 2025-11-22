@@ -1,6 +1,6 @@
 /**
  * Complete encryption workflow for GhostContext
- * Replaces Seal with Web Crypto API
+ * Option A: Random keys stored on-chain for NFT transferability
  */
 
 import { encryptData, decryptData } from "./crypto";
@@ -13,22 +13,20 @@ import {
 
 export interface EncryptedMetadata {
   walrusBlobId: string;
-  salt: string;
+  encryptionKey: string;
   iv: string;
   userAddress: string;
 }
 
 /**
  * Encrypt GhostContext payload and upload to Walrus
+ * Uses random key (NOT wallet signature) for transferability
  */
 export async function encryptAndUpload(
   payload: GhostContextPayload,
-  userAddress: string,
-  walletSigner: {
-    signPersonalMessage: (args: { message: Uint8Array }) => Promise<{ signature: string }>;
-  }
+  userAddress: string
 ): Promise<EncryptedMetadata> {
-  console.log("📦 Starting encryption and upload workflow");
+  console.log("📦 Starting encryption and upload workflow (Option A)");
   console.log("  File:", payload.fileName);
   console.log("  Chunks:", payload.chunks.length);
   
@@ -36,9 +34,10 @@ export async function encryptAndUpload(
   const serialized = serializeGhostContextPayload(payload);
   console.log("  Serialized:", serialized.length, "characters");
   
-  // Encrypt with Web Crypto API
-  const { encryptedBlob, salt, iv } = await encryptData(serialized, walletSigner);
-  console.log("  Encrypted successfully");
+  // Encrypt with Web Crypto API using RANDOM key
+  const { encryptedBlob, encryptionKey, iv } = await encryptData(serialized);
+  console.log("  Encrypted successfully with random key");
+  console.log("  ⚠️ Key will be stored on-chain - anyone with NFT can decrypt!");
   
   // Upload to Walrus
   console.log("  Uploading to Walrus...");
@@ -47,7 +46,7 @@ export async function encryptAndUpload(
   
   return {
     walrusBlobId,
-    salt,
+    encryptionKey,
     iv,
     userAddress,
   };
@@ -55,26 +54,24 @@ export async function encryptAndUpload(
 
 /**
  * Download from Walrus and decrypt GhostContext payload
+ * Anyone with the on-chain key can decrypt
  */
 export async function downloadAndDecrypt(
-  metadata: EncryptedMetadata,
-  walletSigner: {
-    signPersonalMessage: (args: { message: Uint8Array }) => Promise<{ signature: string }>;
-  }
+  metadata: EncryptedMetadata
 ): Promise<GhostContextPayload> {
-  console.log("📥 Starting download and decryption workflow");
+  console.log("📥 Starting download and decryption workflow (Option A)");
   console.log("  Blob ID:", metadata.walrusBlobId);
+  console.log("  Using on-chain encryption key");
   
   // Download from Walrus
   const encryptedBytes = await fetchFromWalrusBytes(metadata.walrusBlobId);
   console.log("  Downloaded:", encryptedBytes.length, "bytes");
   
-  // Decrypt
+  // Decrypt using the on-chain key
   const decrypted = await decryptData(
     encryptedBytes,
-    metadata.salt,
-    metadata.iv,
-    walletSigner
+    metadata.encryptionKey,
+    metadata.iv
   );
   console.log("  Decrypted successfully");
   

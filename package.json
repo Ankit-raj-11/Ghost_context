@@ -9,7 +9,8 @@
     "postinstall": "node patch-transformers.js",
     "deploy": "tsx scripts/deploy.ts",
     "seal:test": "tsx scripts/test-seal.ts",
-    "seal:test-frontend": "tsx scripts/test-seal-frontend.ts"
+    "seal:test-frontend": "tsx scripts/test-seal-frontend.ts",
+    "test:contract": "tsx scripts/test-contract-signature.ts"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.79",

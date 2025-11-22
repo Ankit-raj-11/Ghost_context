@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   ConnectButton,
   useCurrentAccount,
   useSignAndExecuteTransaction,
-  useSignPersonalMessage,
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { RagEngine } from "../services/rag-engine";
@@ -86,9 +86,6 @@ const Home = () => {
   const signAndExecuteTransaction = useSignAndExecuteTransaction({
     mutationKey: ["ghostcontext-sign"],
   });
-  const signPersonalMessage = useSignPersonalMessage({
-    mutationKey: ["ghostcontext-sign-message"],
-  });
 
   const ghostContextPackageId = import.meta.env.VITE_GHOSTCONTEXT_PACKAGE_ID as
     | string
@@ -142,12 +139,50 @@ const Home = () => {
     updateAvailableModels();
   }, []);
 
+  const [searchParams] = useSearchParams();
+
   // Get current RAG engine
   const getRag = useCallback((): RagEngine | RagEngineWeInfer => {
     return selectedEngine === "weinfer"
       ? ragWeInferRef.current!
       : ragStandardRef.current!;
   }, [selectedEngine]);
+
+  // Load context from sessionStorage (from My Purchases)
+  useEffect(() => {
+    const loadContext = searchParams.get("loadContext");
+    if (loadContext === "true") {
+      const storedData = sessionStorage.getItem("loadedContext");
+      if (storedData) {
+        if (!isModelLoaded) {
+          showToastNotification(
+            "Please select and load a model first before loading purchased content.",
+            "error"
+          );
+          return;
+        }
+        
+        const loadPurchasedContext = async () => {
+          try {
+            const { payload } = JSON.parse(storedData);
+            console.log("📥 Loading purchased context from session storage");
+            console.log("📦 Payload has", payload.chunks.length, "chunks");
+            
+            await ingestGhostPayload(payload);
+            
+            sessionStorage.removeItem("loadedContext");
+            showToastNotification(`Loaded: ${payload.fileName} with ${payload.chunks.length} chunks`, "success");
+          } catch (error) {
+            console.error("Failed to load from session:", error);
+            showToastNotification("Failed to load purchased context", "error");
+          }
+        };
+        
+        loadPurchasedContext();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, isModelLoaded]);
 
   const updateAvailableModels = () => {
     const models =
@@ -408,17 +443,12 @@ const Home = () => {
     
     try {
       setIsEncrypting(true);
-      setGhostStatus("🔐 Encrypting with your wallet...");
+      setGhostStatus("🔐 Encrypting with random key (Option A)...");
       
-      const walletSigner = {
-        signPersonalMessage: ({ message }: { message: Uint8Array }) =>
-          signPersonalMessage.mutateAsync({ message }),
-      };
-      
+      // Option A: Random key, no wallet signature needed
       const metadata = await encryptAndUpload(
         ghostPayload,
-        currentAccount.address,
-        walletSigner
+        currentAccount.address
       );
       
       setEncryptionMetadata(metadata);
@@ -432,7 +462,7 @@ const Home = () => {
       });
       
       showToastNotification(
-        `Context encrypted & uploaded! Blob ID: ${metadata.walrusBlobId.substring(0, 20)}...`,
+        `Context encrypted & uploaded! Key will be stored on-chain for NFT transferability.`,
         "success"
       );
     } catch (error: any) {
@@ -470,18 +500,11 @@ const Home = () => {
       setIsLoadingRemote(true);
       setGhostStatus("⬇️ Downloading from Walrus...");
       
-      const walletSigner = {
-        signPersonalMessage: ({ message }: { message: Uint8Array }) =>
-          signPersonalMessage.mutateAsync({ message }),
-      };
-      
-      const payload = await downloadAndDecrypt(
-        {
-          ...encryptionMetadata,
-          walrusBlobId: remoteBlobId.trim(),
-        },
-        walletSigner
-      );
+      // Option A: No wallet signature needed, just use the stored key
+      const payload = await downloadAndDecrypt({
+        ...encryptionMetadata,
+        walrusBlobId: remoteBlobId.trim(),
+      });
       
       setGhostStatus("📦 Loading context...");
       await ingestGhostPayload(payload);
@@ -496,7 +519,7 @@ const Home = () => {
     } catch (error: any) {
       console.error("Failed to load GhostContext:", error);
       showToastNotification(
-        `Failed to load: ${error.message || "Make sure you're using the same wallet that encrypted this data."}`,
+        `Failed to load: ${error.message || "Decryption failed. Check encryption key."}`,
         "error"
       );
     } finally {
@@ -517,13 +540,13 @@ const Home = () => {
       );
       return;
     }
-    if (!walrusBlobId) {
-      showToastNotification("Upload to Walrus first.", "error");
+    if (!walrusBlobId || !encryptionMetadata) {
+      showToastNotification("Encrypt and upload to Walrus first.", "error");
       return;
     }
     try {
       setIsMinting(true);
-      setGhostStatus("🪙 Minting GhostContext NFT...");
+      setGhostStatus("🪙 Minting GhostContext NFT with encryption key...");
       const title = contextTitle || ghostPayload?.fileName || "GhostContext";
       const tx = new Transaction();
       const registryArg = Inputs.SharedObjectRef({
@@ -532,11 +555,14 @@ const Home = () => {
         mutable: true,
       });
 
+      // NEW CONTRACT: Store encryption keys on-chain
       tx.moveCall({
         target: `${ghostContextPackageId}::ghostcontext::create_context`,
         arguments: [
           tx.pure.string(title),
           tx.pure.string(walrusBlobId),
+          tx.pure.string(encryptionMetadata.encryptionKey),
+          tx.pure.string(encryptionMetadata.iv),
           tx.pure.string(contextCategory || "General"),
           tx.object(registryArg),
         ],
@@ -562,7 +588,7 @@ const Home = () => {
         setMintedContextId(contextId);
         await fetchContextSharedVersion(contextId);
       }
-      showToastNotification("GhostContext NFT minted.", "success");
+      showToastNotification("GhostContext NFT minted with encryption key on-chain!", "success");
     } catch (error) {
       console.error("Mint failed", error);
       showToastNotification("Minting failed. Check console.", "error");
