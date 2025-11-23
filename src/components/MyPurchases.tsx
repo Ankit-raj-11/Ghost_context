@@ -68,7 +68,9 @@ const MyPurchases = () => {
           if (obj.data?.content?.dataType === "moveObject") {
             const fields = (obj.data.content as any).fields;
             
-            console.log("Receipt fields:", fields);
+            console.log("📋 Receipt fields:", fields);
+            console.log("🔑 Encryption key from receipt:", fields.encryption_key);
+            console.log("🔑 IV from receipt:", fields.iv);
 
             // Try to get context title
             let contextTitle = "Unknown Context";
@@ -141,15 +143,15 @@ const MyPurchases = () => {
       const payload = deserializeGhostContextPayload(decrypted);
       console.log("✅ Loaded:", payload.fileName);
 
-      // Store in sessionStorage to pass to Home
+      // Store in sessionStorage to pass to Chat
       sessionStorage.setItem("loadedContext", JSON.stringify({
         payload,
         receiptId: receipt.id,
         queriesRemaining: receipt.queriesRemaining,
       }));
 
-      // Navigate to home with chat
-      navigate("/?loadContext=true");
+      // Navigate to chat page
+      navigate("/chat?loadContext=true");
     } catch (error: any) {
       console.error("Failed to load context:", error);
       alert(`Failed to load: ${error.message}`);

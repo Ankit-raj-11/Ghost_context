@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
-import Home from './components/Home';
+import HomeNew from './components/HomeNew';
+import Chat from './components/Home'; // Rename Home to Chat
+import Vault from './components/Vault';
 import Marketplace from './components/Marketplace';
 import MyPurchases from './components/MyPurchases';
 import PrivacyPolicy from './components/PrivacyPolicy';
@@ -19,7 +21,9 @@ function AppContent() {
       <main className={`app-main ${!isLandingPage ? 'app-main-with-nav' : ''}`}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/home" element={<Home />} />
+          <Route path="/home" element={<HomeNew />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/vault" element={<Vault />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/my-purchases" element={<MyPurchases />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />

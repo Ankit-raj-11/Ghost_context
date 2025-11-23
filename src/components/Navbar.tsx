@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ConnectButton } from "@mysten/dapp-kit";
-import { Home, Store, ShoppingBag, Menu, X } from "lucide-react";
+import { Home, Store, ShoppingBag, Menu, X, MessageSquare, Lock } from "lucide-react";
 import "./Navbar.css";
 
 interface NavItem {
@@ -12,6 +12,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: "Home", path: "/home", icon: Home },
+  { name: "Chat", path: "/chat", icon: MessageSquare },
+  { name: "Vault", path: "/vault", icon: Lock },
   { name: "Marketplace", path: "/marketplace", icon: Store },
   { name: "My Purchases", path: "/my-purchases", icon: ShoppingBag },
 ];

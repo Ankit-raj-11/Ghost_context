@@ -351,3 +351,4 @@ const txDetails = await sui.getTransactionBlock({ digest: txHash });
 
 Made with 🔐 for GhostContext
 
+

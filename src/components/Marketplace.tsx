@@ -266,33 +266,51 @@ const Marketplace = () => {
               {filteredContexts.map((context) => (
                 <div key={context.id} className="context-card">
                   <div className="context-header">
-                    <span className="context-category">{context.category}</span>
-                    {context.owner === currentAccount?.address && (
-                      <span className="owner-badge">Your NFT</span>
-                    )}
+                    <div className="context-badges">
+                      <span className="context-category">{context.category}</span>
+                      {context.owner === currentAccount?.address && (
+                        <span className="owner-badge">Your NFT</span>
+                      )}
+                      <span className={`status-badge-inline ${context.isListed ? "status-listed" : "status-unlisted"}`}>
+                        {context.isListed ? "● Listed" : "○ Unlisted"}
+                      </span>
+                    </div>
+                    <button className="context-bookmark" title="Bookmark">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                    </button>
                   </div>
                   
                   <h3>{context.title}</h3>
                   
+                  {context.isListed && context.pricePerQuery && (
+                    <div className="context-price-box">
+                      <span className="context-price-label">Price per Query</span>
+                      <span className="context-price-value">
+                        {(parseInt(context.pricePerQuery) / 1_000_000_000).toFixed(4)} SUI
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="context-details">
                     <div className="detail-row">
-                      <span>Blob ID:</span>
-                      <code>{context.walrusBlobId.substring(0, 20)}...</code>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                      </svg>
+                      <span className="detail-label">Blob ID:</span>
+                      <span className="detail-value">
+                        <code>{context.walrusBlobId.substring(0, 16)}...</code>
+                      </span>
                     </div>
                     <div className="detail-row">
-                      <span>Owner:</span>
-                      <code>{context.owner.substring(0, 10)}...</code>
-                    </div>
-                    {context.isListed && context.pricePerQuery && (
-                      <div className="detail-row">
-                        <span>Price/Query:</span>
-                        <strong>{(parseInt(context.pricePerQuery) / 1_000_000_000).toFixed(2)} SUI</strong>
-                      </div>
-                    )}
-                    <div className="detail-row">
-                      <span>Status:</span>
-                      <span className={context.isListed ? "status-listed" : "status-unlisted"}>
-                        {context.isListed ? "🟢 Listed" : "⚪ Not Listed"}
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                      <span className="detail-label">Owner:</span>
+                      <span className="detail-value">
+                        <code>{context.owner.substring(0, 8)}...</code>
                       </span>
                     </div>
                   </div>

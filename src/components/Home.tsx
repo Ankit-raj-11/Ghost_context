@@ -151,19 +151,20 @@ const Home = () => {
     if (loadContext === "true") {
       const storedData = sessionStorage.getItem("loadedContext");
       if (storedData) {
-        if (!isModelLoaded) {
-          showToastNotification(
-            "Please select and load a model first before loading purchased content.",
-            "error"
-          );
-          return;
-        }
-        
         const loadPurchasedContext = async () => {
           try {
             const { payload } = JSON.parse(storedData);
             console.log("📥 Loading purchased context from session storage");
             console.log("📦 Payload has", payload.chunks.length, "chunks");
+            
+            if (!isModelLoaded) {
+              showToastNotification(
+                `Content ready to load: ${payload.fileName}. Please select and load a model first.`,
+                "error"
+              );
+              // Keep the data in session storage so it can be loaded after model is ready
+              return;
+            }
             
             await ingestGhostPayload(payload);
             
@@ -1083,6 +1084,19 @@ const Home = () => {
         <div className="home-layout">
           {/* LEFT COLUMN - Controls & Settings */}
           <div className="home-controls">
+            {/* Pending Content Banner */}
+            {searchParams.get("loadContext") === "true" && !isModelLoaded && sessionStorage.getItem("loadedContext") && (
+              <div className="controls-section" style={{ background: 'var(--color-warning-light)', borderColor: 'var(--color-warning)' }}>
+                <div className="section-header">
+                  <div className="section-icon">⏳</div>
+                  <h2 className="section-title">Content Ready to Load</h2>
+                </div>
+                <p className="section-description">
+                  Your purchased content is ready. Please select and load a model below to start chatting.
+                </p>
+              </div>
+            )}
+
             {/* Engine Selection */}
             <div className="controls-section">
               <div className="section-header">
@@ -1301,115 +1315,7 @@ const Home = () => {
               )}
             </div>
 
-            {/* GhostContext Vault */}
-            {ghostPayload && currentAccount && (
-              <div className="controls-section">
-                <div className="section-header">
-                  <div className="section-icon">🛡️</div>
-                  <h2 className="section-title">GhostContext Vault</h2>
-                </div>
-                <p className="section-description">
-                  Encrypt, upload to Walrus, and mint as NFT
-                </p>
-                
-                <div className="form-group">
-                  <label className="form-label">Context Title</label>
-                  <input
-                    type="text"
-                    value={contextTitle}
-                    onChange={(e) => setContextTitle(e.target.value)}
-                    placeholder="e.g. Ferrari Engine Manual"
-                    className="form-input"
-                  />
-                </div>
 
-                <div className="form-group">
-                  <label className="form-label">Category</label>
-                  <input
-                    type="text"
-                    value={contextCategory}
-                    onChange={(e) => setContextCategory(e.target.value)}
-                    placeholder="General"
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Price Per Query (MIST)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={pricePerQuery}
-                    onChange={(e) => setPricePerQuery(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-
-                <button
-                  className="btn-control"
-                  onClick={handleEncryptAndUpload}
-                  disabled={isEncrypting}
-                  style={{ marginBottom: 'var(--spacing-sm)' }}
-                >
-                  {isEncrypting ? "Encrypting..." : "🔐 Encrypt & Upload"}
-                </button>
-
-                {walrusBlobId && (
-                  <>
-                    <button
-                      className="btn-control"
-                      onClick={handleMintContext}
-                      disabled={isMinting}
-                      style={{ marginBottom: 'var(--spacing-sm)' }}
-                    >
-                      {isMinting ? "Minting..." : "🪙 Mint NFT"}
-                    </button>
-
-                    {mintedContextId && contextSharedVersion && (
-                      <button
-                        className="btn-control"
-                        onClick={handleListContext}
-                      >
-                        📢 List for Sale
-                      </button>
-                    )}
-                  </>
-                )}
-
-                {ghostStatus && (
-                  <div className="status-badge loading" style={{ marginTop: 'var(--spacing-md)' }}>
-                    {ghostStatus}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Load from Walrus */}
-            {encryptionMetadata && (
-              <div className="controls-section">
-                <div className="section-header">
-                  <div className="section-icon">📥</div>
-                  <h2 className="section-title">Load from Walrus</h2>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Walrus Blob ID</label>
-                  <input
-                    type="text"
-                    value={remoteBlobId}
-                    onChange={(e) => setRemoteBlobId(e.target.value)}
-                    placeholder="Enter Walrus blob ID"
-                    className="form-input"
-                  />
-                </div>
-                <button
-                  className="btn-control"
-                  onClick={handleLoadFromWalrus}
-                  disabled={!remoteBlobId || isLoadingRemote}
-                >
-                  {isLoadingRemote ? "Loading..." : "📥 Load into RAG"}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* RIGHT COLUMN - Chat Interface */}
