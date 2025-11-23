@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { decryptData } from "../ghostcontext/crypto";
 import { fetchFromWalrusBytes } from "../ghostcontext/walrus";
 import { deserializeGhostContextPayload } from "../services/ghostcontext-payload";
+import { Card, CardBody, CardFooter } from "./ui/Card";
+import { User, TrendingUp, ShoppingBag, Copy, Check } from "lucide-react";
 import "./MyPurchases.css";
 
 interface QueryReceipt {
@@ -22,6 +24,7 @@ const MyPurchases = () => {
   const [receipts, setReceipts] = useState<QueryReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingReceipt, setLoadingReceipt] = useState<string | null>(null);
+  const [copiedBlobId, setCopiedBlobId] = useState<string | null>(null);
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
   const navigate = useNavigate();
@@ -114,6 +117,17 @@ const MyPurchases = () => {
     }
   };
 
+  const copyBlobId = async (blobId: string) => {
+    try {
+      await navigator.clipboard.writeText(blobId);
+      setCopiedBlobId(blobId);
+      setTimeout(() => setCopiedBlobId(null), 2000);
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      alert("Failed to copy blob ID");
+    }
+  };
+
   const handleLoadAndChat = async (receipt: QueryReceipt) => {
     try {
       setLoadingReceipt(receipt.id);
@@ -199,51 +213,100 @@ const MyPurchases = () => {
         ) : (
           <div className="receipts-grid">
             {receipts.map((receipt) => (
-              <div key={receipt.id} className="receipt-card">
-                <div className="receipt-header">
-                  <h3>{receipt.contextTitle}</h3>
-                  {receipt.queriesRemaining > 0 ? (
-                    <span className="badge-active">Active</span>
-                  ) : (
-                    <span className="badge-expired">Expired</span>
-                  )}
-                </div>
+              <Card key={receipt.id} className="marketplace-card" hover>
+                <CardBody className="marketplace-card-body">
+                  {/* Title with Status Badge */}
+                  <div className="title-section">
+                    <h3 className="card-title">{receipt.contextTitle}</h3>
+                    {receipt.queriesRemaining > 0 ? (
+                      <span className="category-tag" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>Active</span>
+                    ) : (
+                      <span className="category-tag" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' }}>Expired</span>
+                    )}
+                  </div>
 
-                <div className="receipt-details">
-                  <div className="detail-row">
-                    <span>Queries Remaining:</span>
-                    <strong>{receipt.queriesRemaining} / {receipt.queriesPurchased}</strong>
+                  {/* Document Tags */}
+                  <div className="doc-tags">
+                    <span className="doc-tag">Purchased</span>
+                    <span className="doc-tag">Encrypted</span>
                   </div>
-                  <div className="detail-row">
-                    <span>Receipt ID:</span>
-                    <code>{receipt.id.substring(0, 20)}...</code>
-                  </div>
-                  <div className="detail-row">
-                    <span>Blob ID:</span>
-                    <code>{receipt.walrusBlobId.substring(0, 20)}...</code>
-                  </div>
-                </div>
 
-                <div className="receipt-actions">
+                  {/* Queries Info */}
+                  <div className="price-container">
+                    <div>
+                      <div className="price-row">
+                        <span className="price-value">{receipt.queriesRemaining}</span>
+                        <span className="price-unit">/ {receipt.queriesPurchased}</span>
+                      </div>
+                      <span className="price-subtitle">queries remaining</span>
+                    </div>
+                  </div>
+
+                  {/* Stats Row */}
+                  <div className="stats-row">
+                    <div className="stat-item">
+                      <ShoppingBag size={12} />
+                      <span className="stat-value">{receipt.queriesPurchased}</span>
+                      <span className="stat-label">purchased</span>
+                    </div>
+                    <div className="stat-divider"></div>
+                    <div className="stat-item">
+                      <TrendingUp size={12} />
+                      <span className="stat-value">{receipt.queriesRemaining}</span>
+                      <span className="stat-label">left</span>
+                    </div>
+                  </div>
+
+                  {/* Receipt ID */}
+                  <div className="owner-row">
+                    <User size={14} />
+                    <span className="owner-address">
+                      {receipt.id.substring(0, 8)}...{receipt.id.substring(receipt.id.length - 6)}
+                    </span>
+                  </div>
+
+                  {/* Blob ID with Copy Button */}
+                  <div className="blob-id-row">
+                    <div className="blob-id-content">
+                      <span className="blob-id-label">Blob ID:</span>
+                      <span className="blob-id-value">
+                        {receipt.walrusBlobId.substring(0, 12)}...{receipt.walrusBlobId.substring(receipt.walrusBlobId.length - 8)}
+                      </span>
+                    </div>
+                    <button
+                      className="copy-btn"
+                      onClick={() => copyBlobId(receipt.walrusBlobId)}
+                      title="Copy full blob ID"
+                    >
+                      {copiedBlobId === receipt.walrusBlobId ? (
+                        <Check size={14} />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                  </div>
+                </CardBody>
+
+                <CardFooter className="marketplace-card-footer">
                   {!receipt.encryptionKey || !receipt.iv ? (
-                    <button className="btn-secondary" disabled title="This receipt is from the old contract without encryption keys">
-                      ⚠️ No Keys (Old Receipt)
+                    <button className="action-btn unavailable-btn" disabled title="This receipt is from the old contract without encryption keys">
+                      ⚠️ No Keys
                     </button>
                   ) : receipt.queriesRemaining > 0 ? (
                     <button
-                      className="btn-primary"
+                      className="action-btn purchase-btn"
                       onClick={() => handleLoadAndChat(receipt)}
                       disabled={loadingReceipt === receipt.id}
                     >
                       {loadingReceipt === receipt.id ? "Loading..." : "🔓 Load & Chat"}
                     </button>
                   ) : (
-                    <button className="btn-secondary" disabled>
+                    <button className="action-btn unavailable-btn" disabled>
                       No Queries Left
                     </button>
                   )}
-                </div>
-              </div>
+                </CardFooter>
+              </Card>
             ))}
           </div>
         )}

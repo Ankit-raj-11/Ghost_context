@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  ConnectButton,
   useCurrentAccount,
   useSignAndExecuteTransaction,
   useSuiClient,
 } from "@mysten/dapp-kit";
-import { Upload, Lock, Coins, List } from "lucide-react";
+import { Upload, Lock, FileText, Check } from "lucide-react";
 import { RagEngine } from "../services/rag-engine";
 import { LlmClient } from "../services/llm-client";
 import { Embedder } from "../services/embedder";
@@ -293,197 +292,191 @@ const Vault = () => {
     }
   };
 
+  // Show connect wallet overlay if not connected
+  if (!currentAccount) {
+    return (
+      <div className="vault-container">
+        <div className="vault-overlay">
+          <div className="vault-overlay-content">
+            <Lock size={64} className="vault-overlay-icon" />
+            <h2 className="vault-overlay-title">Connect Your Wallet</h2>
+            <p className="vault-overlay-text">
+              Connect your Sui wallet to encrypt documents and mint NFTs
+            </p>
+            <div style={{
+              background: 'linear-gradient(135deg, #6C63FF 0%, #8B7FFF 100%)',
+              borderRadius: '12px',
+              boxShadow: '0 4px 16px rgba(108, 99, 255, 0.25)',
+              display: 'inline-block',
+            }}>
+              {/* ConnectButton will be rendered here */}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="vault-container">
-      <div className="vault-content">
-        <div className="vault-header">
-          <h1 className="vault-title">🛡️ GhostContext Vault</h1>
-          <p className="vault-subtitle">
-            Encrypt your documents and mint them as NFTs on the blockchain
-          </p>
-        </div>
-
-        {/* Wallet Connection */}
-        <div className="vault-card">
-          <div className="vault-card-header">
-            <Lock size={24} />
-            <h2>Wallet Connection</h2>
-          </div>
-          <p className="vault-card-description">
-            Connect your Sui wallet to encrypt and mint NFTs
-          </p>
-          <ConnectButton />
-          {currentAccount && (
-            <div className="status-badge" style={{ marginTop: "var(--spacing-md)" }}>
-              ✅ Connected: {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
-            </div>
-          )}
-        </div>
-
-        {/* Step 1: Upload Document */}
-        <div className="vault-card">
-          <div className="vault-card-header">
-            <Upload size={24} />
-            <h2>Step 1: Upload Document</h2>
-          </div>
-          <p className="vault-card-description">
-            Upload a PDF document to process and encrypt
-          </p>
-
-          {!uploading && !ghostPayload && (
-            <label htmlFor="vaultFileInput" className="vault-upload-area">
-              <input
-                type="file"
-                id="vaultFileInput"
-                accept=".pdf"
-                onChange={onFileUpload}
-                disabled={uploading}
-              />
-              <div className="upload-icon">📎</div>
-              <p className="upload-text">Click to choose PDF file</p>
-              <p className="upload-hint">Your document will be processed locally</p>
-            </label>
-          )}
-
-          {uploading && (
-            <div>
-              <p style={{ marginBottom: "var(--spacing-md)", fontWeight: "var(--font-medium)" }}>
-                📄 Processing: {uploadFileName}
-              </p>
-              <div className="progress-container">
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${uploadProgress}%` }}></div>
+      <div className="vault-content-wrapper">
+        {/* 2-Column Grid Layout */}
+        <div className="vault-grid">
+          {/* LEFT COLUMN - Upload Zone (40%) */}
+          <div className="vault-upload-column">
+            {!ghostPayload ? (
+              /* Drop Zone */
+              <label htmlFor="vaultFileInput" className="vault-dropzone">
+                <input
+                  type="file"
+                  id="vaultFileInput"
+                  accept=".pdf"
+                  onChange={onFileUpload}
+                  disabled={uploading}
+                  style={{ display: 'none' }}
+                />
+                <Upload size={64} className="dropzone-icon" />
+                <h3 className="dropzone-title">
+                  {uploading ? 'Processing...' : 'Drag & drop your PDF here'}
+                </h3>
+                <p className="dropzone-text">
+                  {uploading ? uploadStatus : 'or click to browse'}
+                </p>
+                {uploading && (
+                  <div className="dropzone-progress">
+                    <div className="progress-bar-modern">
+                      <div className="progress-fill-modern" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                    <p className="progress-percent">{uploadProgress}%</p>
+                  </div>
+                )}
+              </label>
+            ) : (
+              /* File Preview Card */
+              <div className="vault-file-preview">
+                <FileText size={80} className="file-preview-icon" />
+                <h3 className="file-preview-name">{ghostPayload.fileName}</h3>
+                <div className="file-preview-badge">
+                  <Check size={16} />
+                  <span>Ready to Encrypt</span>
                 </div>
-                <p className="progress-text">{uploadStatus}</p>
-              </div>
-            </div>
-          )}
-
-          {!uploading && ghostPayload && (
-            <div>
-              <div className="status-badge" style={{ marginBottom: "var(--spacing-md)" }}>
-                ✅ Loaded: {ghostPayload.fileName}
-              </div>
-              <button
-                className="btn-vault-secondary"
-                onClick={() => {
-                  setGhostPayload(null);
-                  setWalrusBlobId("");
-                  setMintedContextId("");
-                  setContextSharedVersion(null);
-                }}
-              >
-                🔄 Change Document
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Step 2: Configure & Encrypt */}
-        {ghostPayload && currentAccount && (
-          <div className="vault-card">
-            <div className="vault-card-header">
-              <Lock size={24} />
-              <h2>Step 2: Configure & Encrypt</h2>
-            </div>
-            <p className="vault-card-description">
-              Set metadata and encrypt your document
-            </p>
-
-            <div className="vault-form">
-              <div className="form-group">
-                <label className="form-label">Context Title</label>
-                <input
-                  type="text"
-                  value={contextTitle}
-                  onChange={(e) => setContextTitle(e.target.value)}
-                  placeholder="e.g. Ferrari Engine Manual"
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <input
-                  type="text"
-                  value={contextCategory}
-                  onChange={(e) => setContextCategory(e.target.value)}
-                  placeholder="General"
-                  className="form-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Price Per Query (MIST)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={pricePerQuery}
-                  onChange={(e) => setPricePerQuery(e.target.value)}
-                  className="form-input"
-                />
-              </div>
-
-              <button
-                className="btn-vault-primary"
-                onClick={handleEncryptAndUpload}
-                disabled={isEncrypting}
-              >
-                {isEncrypting ? "Encrypting..." : "🔐 Encrypt & Upload to Walrus"}
-              </button>
-
-              {walrusBlobId && (
-                <div className="status-badge" style={{ marginTop: "var(--spacing-md)" }}>
-                  ✅ Uploaded to Walrus: {walrusBlobId.substring(0, 20)}...
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Mint NFT */}
-        {walrusBlobId && currentAccount && (
-          <div className="vault-card">
-            <div className="vault-card-header">
-              <Coins size={24} />
-              <h2>Step 3: Mint NFT</h2>
-            </div>
-            <p className="vault-card-description">
-              Mint your encrypted document as an NFT
-            </p>
-
-            <button
-              className="btn-vault-primary"
-              onClick={handleMintContext}
-              disabled={isMinting}
-            >
-              {isMinting ? "Minting..." : "🪙 Mint Context NFT"}
-            </button>
-
-            {mintedContextId && (
-              <div className="status-badge" style={{ marginTop: "var(--spacing-md)" }}>
-                ✅ Minted NFT: {mintedContextId.substring(0, 20)}...
+                <button
+                  className="file-preview-change"
+                  onClick={() => {
+                    setGhostPayload(null);
+                    setWalrusBlobId("");
+                    setMintedContextId("");
+                    setContextSharedVersion(null);
+                    setEncryptionMetadata(null);
+                  }}
+                >
+                  Change File
+                </button>
               </div>
             )}
           </div>
-        )}
 
-        {/* Step 4: List for Sale */}
-        {mintedContextId && contextSharedVersion && (
-          <div className="vault-card">
-            <div className="vault-card-header">
-              <List size={24} />
-              <h2>Step 4: List for Sale</h2>
+          {/* RIGHT COLUMN - Configuration Form (60%) */}
+          <div className="vault-config-column">
+            <div className="vault-config-card">
+              <h2 className="config-title">Encryption Metadata</h2>
+              
+              <div className="config-form">
+                <div className="form-field">
+                  <label className="field-label">Title</label>
+                  <input
+                    type="text"
+                    value={contextTitle}
+                    onChange={(e) => setContextTitle(e.target.value)}
+                    placeholder="e.g. Ferrari Engine Manual"
+                    className="field-input"
+                    disabled={!ghostPayload}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Category</label>
+                  <select
+                    value={contextCategory}
+                    onChange={(e) => setContextCategory(e.target.value)}
+                    className="field-select"
+                    disabled={!ghostPayload}
+                  >
+                    <option value="General">General</option>
+                    <option value="Technical">Technical</option>
+                    <option value="Medical">Medical</option>
+                    <option value="Legal">Legal</option>
+                    <option value="Financial">Financial</option>
+                    <option value="Educational">Educational</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label className="field-label">Price Per Query</label>
+                  <div className="field-input-group">
+                    <input
+                      type="number"
+                      min="1"
+                      value={pricePerQuery}
+                      onChange={(e) => setPricePerQuery(e.target.value)}
+                      className="field-input-with-suffix"
+                      disabled={!ghostPayload}
+                    />
+                    <span className="field-suffix">MIST</span>
+                  </div>
+                </div>
+
+                {/* Main Action Button */}
+                {!walrusBlobId ? (
+                  <button
+                    className="btn-vault-main"
+                    onClick={handleEncryptAndUpload}
+                    disabled={!ghostPayload || isEncrypting}
+                  >
+                    <Lock size={20} />
+                    <span>{isEncrypting ? 'Encrypting...' : 'Encrypt & Mint NFT'}</span>
+                  </button>
+                ) : !mintedContextId ? (
+                  <button
+                    className="btn-vault-main"
+                    onClick={handleMintContext}
+                    disabled={isMinting}
+                  >
+                    <Lock size={20} />
+                    <span>{isMinting ? 'Minting...' : 'Mint NFT'}</span>
+                  </button>
+                ) : !contextSharedVersion ? (
+                  <div className="success-message">
+                    <Check size={24} />
+                    <span>NFT Minted Successfully!</span>
+                  </div>
+                ) : (
+                  <button
+                    className="btn-vault-main"
+                    onClick={handleListContext}
+                  >
+                    <Lock size={20} />
+                    <span>List for Sale</span>
+                  </button>
+                )}
+
+                {/* Status Messages */}
+                {walrusBlobId && (
+                  <div className="status-message success">
+                    <Check size={16} />
+                    <span>Encrypted & uploaded to Walrus</span>
+                  </div>
+                )}
+                {mintedContextId && (
+                  <div className="status-message success">
+                    <Check size={16} />
+                    <span>NFT minted successfully</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <p className="vault-card-description">
-              List your NFT on the marketplace
-            </p>
-
-            <button className="btn-vault-primary" onClick={handleListContext}>
-              📢 List Context for Sale
-            </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Toast Notification */}

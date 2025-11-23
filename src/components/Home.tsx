@@ -23,6 +23,10 @@ import {
   createGhostContextPayload,
   type GhostContextPayload,
 } from "../services/ghostcontext-payload";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import walrusIcon from "./assets/walrus.svg";
+import sealIcon from "./assets/seal.svg";
 import "./Home.css";
 
 interface ChatMessage {
@@ -106,6 +110,7 @@ const Home = () => {
 
   // UI State
   const [shouldStopGeneration, setShouldStopGeneration] = useState(false);
+  const [activeSection, setActiveSection] = useState<'engine' | 'model' | 'rag' | 'upload' | null>('engine');
 
   // Refs for services
   const ragStandardRef = useRef<RagEngine | null>(null);
@@ -199,12 +204,17 @@ const Home = () => {
       return;
     }
 
-    console.log(
-      `🔄 Switched to ${engine === "weinfer" ? "WeInfer" : "WebLLM"} engine`
-    );
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`🔄 ENGINE SELECTED: ${engine === "weinfer" ? "WeInfer (Optimized)" : "WebLLM (Standard)"}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     setSelectedEngine(engine);
     setSelectedModel("");
     updateAvailableModels();
+    
+    // Auto-collapse and move to next section
+    setTimeout(() => {
+      setActiveSection('model');
+    }, 300);
   };
 
   const checkBrowserCapabilities = (): {
@@ -394,6 +404,11 @@ const Home = () => {
       console.log("✅ RAG initialization complete");
       setLoading(false);
       setIsModelLoaded(true);
+      
+      // Auto-collapse and move to next section
+      setTimeout(() => {
+        setActiveSection('upload');
+      }, 500);
     } catch (error) {
       console.error("❌ Initialization error:", error);
       setLoading(false);
@@ -718,6 +733,11 @@ const Home = () => {
           `Document "${file.name}" ingested successfully!`,
           "success"
         );
+        
+        // Auto-collapse after upload complete
+        setTimeout(() => {
+          setActiveSection(null);
+        }, 1000);
       } catch (error) {
         console.error("❌ Ingestion error:", error);
         showToastNotification(
@@ -753,7 +773,12 @@ const Home = () => {
     setAnswer("");
 
     const currentQuestion = question;
-    console.log("🚀 Starting query:", currentQuestion);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`🚀 QUERY STARTED`);
+    console.log(`📝 Question: ${currentQuestion}`);
+    console.log(`⚙️ Using Engine: ${selectedEngine === "weinfer" ? "WeInfer (Optimized)" : "WebLLM (Standard)"}`);
+    console.log(`🤖 Model: ${getCurrentModelName()}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     const userMessage: ChatMessage = {
       role: "user",
@@ -802,8 +827,6 @@ const Home = () => {
         enableSourceCitations
       );
 
-      console.log("📝 Final answer length:", answer.length);
-
       if (enableConversationalMemory && answer) {
         setConversationHistory((prev) => [
           ...prev,
@@ -817,7 +840,7 @@ const Home = () => {
         );
       }
 
-      console.log("✅ Query complete!");
+
     } catch (error: any) {
       console.error("❌ Query error:", error);
       if (error.message === "STOPPED_BY_USER") {
@@ -845,7 +868,6 @@ const Home = () => {
         });
       }
     } finally {
-      console.log("🏁 Query finished - cleaning up");
       setQuerying(false);
       setShouldStopGeneration(false);
     }
@@ -1084,11 +1106,40 @@ const Home = () => {
         <div className="home-layout">
           {/* LEFT COLUMN - Controls & Settings */}
           <div className="home-controls">
+            {/* Progress Bar - Upper Right */}
+            <div className="setup-progress-sidebar">
+              <div className="progress-percentage">
+                {Math.round((
+                  (selectedEngine ? 25 : 0) +
+                  (isModelLoaded ? 25 : 0) +
+                  (loadedDocumentName ? 50 : 0)
+                ))}%
+              </div>
+              <div className="progress-bar-vertical">
+                <div 
+                  className="progress-fill-vertical" 
+                  style={{ 
+                    height: `${
+                      (selectedEngine ? 25 : 0) +
+                      (isModelLoaded ? 25 : 0) +
+                      (loadedDocumentName ? 50 : 0)
+                    }%` 
+                  }}
+                ></div>
+                <div className="progress-steps-vertical">
+                  <div className={`progress-step-dot ${selectedEngine ? 'completed' : 'pending'}`}></div>
+                  <div className={`progress-step-dot ${isModelLoaded ? 'completed' : selectedEngine ? 'active' : 'pending'}`}></div>
+                  <div className={`progress-step-dot ${loadedDocumentName ? 'completed' : isModelLoaded ? 'active' : 'pending'}`}></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="home-controls-inner">
+            <div className="controls-sections-wrapper">
             {/* Pending Content Banner */}
             {searchParams.get("loadContext") === "true" && !isModelLoaded && sessionStorage.getItem("loadedContext") && (
               <div className="controls-section" style={{ background: 'var(--color-warning-light)', borderColor: 'var(--color-warning)' }}>
                 <div className="section-header">
-                  <div className="section-icon">⏳</div>
                   <h2 className="section-title">Content Ready to Load</h2>
                 </div>
                 <p className="section-description">
@@ -1098,11 +1149,24 @@ const Home = () => {
             )}
 
             {/* Engine Selection */}
-            <div className="controls-section">
-              <div className="section-header">
-                <div className="section-icon">⚡</div>
-                <h2 className="section-title">Engine Selection</h2>
+            <div className={`step-card ${selectedEngine ? 'completed' : activeSection === 'engine' ? 'active' : 'pending'}`}>
+              <div 
+                className="step-header" 
+                onClick={() => !isModelLoaded && setActiveSection(activeSection === 'engine' ? null : 'engine')}
+                style={{ cursor: isModelLoaded ? 'default' : 'pointer' }}
+              >
+                <div className="step-number-wrapper">
+                  <div className="step-number">
+                    {selectedEngine ? '✓' : '1'}
+                  </div>
+                  <h3 className="step-title">Select Engine</h3>
+                </div>
+                <span className="step-icon">
+                  {selectedEngine ? '✓' : activeSection === 'engine' ? '▲' : '▼'}
+                </span>
               </div>
+              {activeSection === 'engine' && (
+              <div className="step-content">
               <div className="option-group">
                 <label className={`option-item ${selectedEngine === "webllm" ? "selected" : ""}`}>
                   <input
@@ -1131,23 +1195,33 @@ const Home = () => {
                   />
                   <div className="option-content">
                     <div className="option-title">WeInfer (Optimized)</div>
-                    <div className="option-description">⚡ ~3.76x faster with buffer reuse</div>
+                    <div className="option-description">~3.76x faster with buffer reuse</div>
                   </div>
                 </label>
               </div>
-              {isModelLoaded && (
-                <div className="status-badge" style={{ marginTop: 'var(--spacing-md)' }}>
-                  ✅ Engine: {selectedEngine === "weinfer" ? "WeInfer" : "WebLLM"}
-                </div>
+              </div>
               )}
             </div>
 
             {/* Model Selection */}
-            <div className="controls-section">
-              <div className="section-header">
-                <div className="section-icon">🤖</div>
-                <h2 className="section-title">Model Selection</h2>
+            <div className={`step-card ${isModelLoaded ? 'completed' : activeSection === 'model' ? 'active' : 'pending'} ${!selectedEngine ? 'disabled' : ''}`}>
+              <div 
+                className="step-header" 
+                onClick={() => selectedEngine && !isModelLoaded && setActiveSection(activeSection === 'model' ? null : 'model')}
+                style={{ cursor: selectedEngine && !isModelLoaded ? 'pointer' : 'default' }}
+              >
+                <div className="step-number-wrapper">
+                  <div className="step-number">
+                    {isModelLoaded ? '✓' : '2'}
+                  </div>
+                  <h3 className="step-title">Select Model</h3>
+                </div>
+                <span className="step-icon">
+                  {isModelLoaded ? '✓' : activeSection === 'model' ? '▲' : '▼'}
+                </span>
               </div>
+              {activeSection === 'model' && selectedEngine && (
+              <div className="step-content">
               <div className="form-group">
                 <label htmlFor="modelSelect" className="form-label">Choose LLM Model:</label>
                 <select
@@ -1165,19 +1239,25 @@ const Home = () => {
                   ))}
                 </select>
               </div>
-              {isModelLoaded && (
-                <div className="status-badge">
-                  ✅ Model loaded: {getCurrentModelName()}
-                </div>
+              </div>
               )}
             </div>
 
-            {/* RAG Options */}
-            <div className="controls-section">
-              <div className="section-header">
-                <div className="section-icon">⚙️</div>
-                <h2 className="section-title">RAG Options</h2>
+            {/* RAG Options - Optional */}
+            <div className={`step-card optional-step ${activeSection === 'rag' ? 'active' : 'pending'}`}>
+              <div 
+                className="step-header" 
+                onClick={() => setActiveSection(activeSection === 'rag' ? null : 'rag')}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="step-number-wrapper">
+                  <div className="step-number optional-number">⚙</div>
+                  <h3 className="step-title">Advanced Options <span className="optional-badge">Optional</span></h3>
+                </div>
+                <span className="step-icon">{activeSection === 'rag' ? '▲' : '▼'}</span>
               </div>
+              {activeSection === 'rag' && (
+              <div className="step-content">
               <div className="option-group">
                 <label className="option-item">
                   <input
@@ -1188,7 +1268,7 @@ const Home = () => {
                     className="option-checkbox"
                   />
                   <div className="option-content">
-                    <div className="option-title">📖 Source Citations</div>
+                    <div className="option-title">Source Citations</div>
                     <div className="option-description">Show page numbers in answers</div>
                   </div>
                 </label>
@@ -1201,7 +1281,7 @@ const Home = () => {
                     className="option-checkbox"
                   />
                   <div className="option-content">
-                    <div className="option-title">💭 Conversational Memory</div>
+                    <div className="option-title">Conversational Memory</div>
                     <div className="option-description">Remember previous questions</div>
                   </div>
                 </label>
@@ -1214,7 +1294,7 @@ const Home = () => {
                     className="option-checkbox"
                   />
                   <div className="option-content">
-                    <div className="option-title">🔍 Hybrid Search</div>
+                    <div className="option-title">Hybrid Search</div>
                     <div className="option-description">Semantic + keyword search</div>
                   </div>
                 </label>
@@ -1226,17 +1306,32 @@ const Home = () => {
                   disabled={querying}
                   style={{ marginTop: 'var(--spacing-md)' }}
                 >
-                  🗑️ Clear Conversation ({conversationHistory.length})
+                  Clear Conversation ({conversationHistory.length})
                 </button>
+              )}
+              </div>
               )}
             </div>
 
             {/* Document Upload */}
-            <div className="controls-section">
-              <div className="section-header">
-                <div className="section-icon">📄</div>
-                <h2 className="section-title">Upload Document</h2>
+            <div className={`step-card ${loadedDocumentName ? 'completed' : activeSection === 'upload' ? 'active' : 'pending'} ${!isModelLoaded ? 'disabled' : ''}`}>
+              <div 
+                className="step-header" 
+                onClick={() => isModelLoaded && setActiveSection(activeSection === 'upload' ? null : 'upload')}
+                style={{ cursor: isModelLoaded ? 'pointer' : 'default' }}
+              >
+                <div className="step-number-wrapper">
+                  <div className="step-number">
+                    {loadedDocumentName ? '✓' : '3'}
+                  </div>
+                  <h3 className="step-title">Upload Document</h3>
+                </div>
+                <span className="step-icon">
+                  {loadedDocumentName ? '✓' : activeSection === 'upload' ? '▲' : '▼'}
+                </span>
               </div>
+              {activeSection === 'upload' && isModelLoaded && (
+              <div className="step-content">
               <p className="section-description">
                 Upload a PDF document to chat with using AI
               </p>
@@ -1250,7 +1345,6 @@ const Home = () => {
                     onChange={onFileUpload}
                     disabled={uploading || !isModelLoaded}
                   />
-                  <div className="upload-icon">📎</div>
                   <p className="upload-text">Click to choose PDF file</p>
                   <p className="upload-hint">100% local - never sent to any server</p>
                 </label>
@@ -1258,7 +1352,6 @@ const Home = () => {
 
               {!isModelLoaded && (
                 <div className="upload-area" style={{ cursor: 'not-allowed', opacity: 0.6 }}>
-                  <div className="upload-icon">⚠️</div>
                   <p className="upload-text">Load a model first</p>
                 </div>
               )}
@@ -1266,7 +1359,7 @@ const Home = () => {
               {uploading && (
                 <div>
                   <p style={{ marginBottom: 'var(--spacing-md)', fontWeight: 'var(--font-medium)' }}>
-                    📄 Processing: {uploadFileName}
+                    Processing: {uploadFileName}
                   </p>
                   <div className="progress-container">
                     <div className="progress-bar">
@@ -1280,7 +1373,7 @@ const Home = () => {
               {!uploading && loadedDocumentName && (
                 <div>
                   <div className="status-badge" style={{ marginBottom: 'var(--spacing-md)' }}>
-                    ✅ Loaded: {loadedDocumentName}
+                    Loaded: {loadedDocumentName}
                   </div>
                   <button
                     className="btn-control-secondary"
@@ -1292,47 +1385,33 @@ const Home = () => {
                       setContextSharedVersion(null);
                     }}
                   >
-                    🔄 Change Document
+                    Change Document
                   </button>
                 </div>
               )}
-            </div>
-
-            {/* Wallet Connection */}
-            <div className="controls-section">
-              <div className="section-header">
-                <div className="section-icon">🔐</div>
-                <h2 className="section-title">Wallet & Access</h2>
               </div>
-              <p className="section-description">
-                Connect your Sui wallet to mint NFTs and access encrypted content
-              </p>
-              <ConnectButton />
-              {currentAccount && (
-                <div className="status-badge" style={{ marginTop: 'var(--spacing-md)' }}>
-                  ✅ Connected: {currentAccount.address.slice(0, 6)}...{currentAccount.address.slice(-4)}
-                </div>
               )}
             </div>
 
+            </div>
 
+            {/* Powered By Section - Bottom */}
+            <div className="powered-by-section">
+              <div className="powered-by-text">Powered by</div>
+              <img src={walrusIcon} alt="Walrus" className="powered-by-icon" />
+              <div className="powered-by-divider">and</div>
+              <img src={sealIcon} alt="SUI" className="powered-by-icon" />
+            </div>
+
+            </div>
           </div>
 
           {/* RIGHT COLUMN - Chat Interface */}
           <div className="home-chat">
-            {/* Chat Header */}
-            <div className="chat-header">
-              <h2 className="chat-header-title">💬 AI Chat</h2>
-              <p className="chat-header-subtitle">
-                {loadedDocumentName ? `Chatting with: ${loadedDocumentName}` : "Upload a document to start chatting"}
-              </p>
-            </div>
-
             {/* Chat Messages */}
             <div className="chat-messages-container" ref={chatContainerRef}>
               {chatMessages.length === 0 ? (
                 <div className="chat-empty-state">
-                  <div className="chat-empty-icon">💬</div>
                   <h3 className="chat-empty-title">Ready to chat!</h3>
                   <p className="chat-empty-text">Upload a PDF document and start asking questions.</p>
                 </div>
@@ -1341,7 +1420,11 @@ const Home = () => {
                   {chatMessages.map((message, index) => (
                     <div key={index} className={`message-wrapper ${message.role}`}>
                       <div className="message-bubble">
-                        <p className="message-content">{message.content}</p>
+                        <div className="message-content">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
                         <div className="message-meta">
                           <span className="message-time">
                             {message.timestamp.toLocaleTimeString("en-US", {
@@ -1351,7 +1434,7 @@ const Home = () => {
                           </span>
                           {message.sources && message.sources.length > 0 && (
                             <span className="message-sources">
-                              📄 Pages: {getPageNumbers(message.sources)}
+                              Pages: {getPageNumbers(message.sources)}
                             </span>
                           )}
                         </div>
@@ -1419,7 +1502,6 @@ const Home = () => {
       {/* Toast Notification */}
       {showToast && (
         <div className={`toast ${toastType}`}>
-          <span className="toast-icon">{toastType === "success" ? "✅" : "❌"}</span>
           <span className="toast-message">{toastMessage}</span>
         </div>
       )}

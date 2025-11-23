@@ -1,59 +1,62 @@
 import { useNavigate } from "react-router-dom";
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
-import { Home, Store, ShoppingBag, Lock, Bot, DollarSign, Cloud, ArrowRight, Sparkles } from "lucide-react";
+import { Lock, Bot, DollarSign, Cloud, ArrowRight, Sparkles, Shield, Database, Coins, Cpu } from "lucide-react";
 import "./LandingPage.css";
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
 
+  const features = [
+    {
+      icon: Shield,
+      title: "End-to-End Encryption",
+      description: "AES-GCM encryption ensures only you hold the keys.",
+      color: "violet"
+    },
+    {
+      icon: Database,
+      title: "Decentralized Storage",
+      description: "Decentralized blob storage powered by Walrus.",
+      color: "blue"
+    },
+    {
+      icon: Coins,
+      title: "Instant Commerce",
+      description: "Sell access rights instantly via Sui Smart Contracts.",
+      color: "emerald"
+    },
+    {
+      icon: Cpu,
+      title: "Private Local AI",
+      description: "Chat via WebLLM. Data never leaves your browser.",
+      color: "pink"
+    }
+  ];
+
   return (
     <div className="landing-container">
-      {/* Modern Navigation */}
-      <nav className="landing-nav">
-        <div className="landing-nav-container">
-          <div className="landing-logo">
-            <span className="landing-logo-icon">👻</span>
-            <span className="landing-logo-text">GhostContext</span>
-          </div>
-          
-          <div className="landing-nav-links">
-            <button onClick={() => navigate("/home")} className="landing-nav-link">
-              <Home size={18} />
-              <span>Home</span>
-            </button>
-            <button onClick={() => navigate("/marketplace")} className="landing-nav-link">
-              <Store size={18} />
-              <span>Marketplace</span>
-            </button>
-            <button onClick={() => navigate("/my-purchases")} className="landing-nav-link">
-              <ShoppingBag size={18} />
-              <span>Purchases</span>
-            </button>
-          </div>
-
-          <div className="landing-nav-actions">
-            <ConnectButton />
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <main className="landing-hero">
+        {/* Gradient Blob Background */}
+        <div className="gradient-blob"></div>
+        <div className="gradient-blob-2"></div>
+        
         <div className="landing-hero-container">
           <div className="landing-hero-badge">
-            <Sparkles size={16} />
+            <Sparkles size={14} strokeWidth={2.5} />
             <span>Powered by Sui & Walrus</span>
           </div>
           
           <h1 className="landing-hero-title">
             Decentralized Marketplace for
-            <span className="landing-hero-gradient"> Encrypted AI Knowledge</span>
+            <br />
+            <span className="landing-hero-gradient">Private AI Knowledge</span>
           </h1>
           
           <p className="landing-hero-subtitle">
             Upload, encrypt, and monetize your documents with blockchain-powered access control. 
-            Buy and chat with encrypted knowledge contexts using local AI.
+            Buy and chat with encrypted knowledge contexts using local AI that never leaves your browser.
           </p>
 
           <div className="landing-hero-actions">
@@ -64,7 +67,7 @@ const LandingPage = () => {
                   onClick={() => navigate("/home")}
                 >
                   <span>Start Creating</span>
-                  <ArrowRight size={20} />
+                  <ArrowRight size={20} strokeWidth={2.5} />
                 </button>
                 <button 
                   className="landing-btn-secondary"
@@ -81,47 +84,20 @@ const LandingPage = () => {
             )}
           </div>
 
-          {/* Features Grid */}
+          {/* Premium Features Grid */}
           <div className="landing-features">
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon">
-                <Lock size={24} />
-              </div>
-              <h3 className="landing-feature-title">Encrypted Storage</h3>
-              <p className="landing-feature-text">
-                AES-256-GCM encryption with keys stored securely on-chain
-              </p>
-            </div>
-
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon">
-                <Bot size={24} />
-              </div>
-              <h3 className="landing-feature-title">AI-Powered Chat</h3>
-              <p className="landing-feature-text">
-                Chat with your documents using local AI models
-              </p>
-            </div>
-
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon">
-                <DollarSign size={24} />
-              </div>
-              <h3 className="landing-feature-title">Monetize Knowledge</h3>
-              <p className="landing-feature-text">
-                Sell access to your encrypted content as NFTs
-              </p>
-            </div>
-
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon">
-                <Cloud size={24} />
-              </div>
-              <h3 className="landing-feature-title">Decentralized</h3>
-              <p className="landing-feature-text">
-                Built on Sui blockchain and Walrus storage
-              </p>
-            </div>
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <div key={index} className="landing-feature-card">
+                  <div className={`landing-feature-icon icon-${feature.color}`}>
+                    <Icon size={24} strokeWidth={2} />
+                  </div>
+                  <h3 className="landing-feature-title">{feature.title}</h3>
+                  <p className="landing-feature-text">{feature.description}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </main>

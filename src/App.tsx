@@ -12,13 +12,10 @@ import './theme.css';
 import './App.css';
 
 function AppContent() {
-  const location = useLocation();
-  const isLandingPage = location.pathname === '/';
-
   return (
     <div className="app-layout">
-      {!isLandingPage && <Navbar />}
-      <main className={`app-main ${!isLandingPage ? 'app-main-with-nav' : ''}`}>
+      <Navbar />
+      <main className="app-main app-main-with-nav">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/home" element={<HomeNew />} />

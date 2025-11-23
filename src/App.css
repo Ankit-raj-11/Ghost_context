@@ -249,3 +249,105 @@
   margin-bottom: var(--spacing-xl);
 }
 
+
+/* ============================================
+   GLOBAL WALLET BUTTON STYLING
+   ============================================ */
+
+/* Override Sui Wallet Kit default styles */
+[data-dapp-kit] button,
+[data-dapp-kit] [role="button"] {
+  background: linear-gradient(135deg, #6C63FF 0%, #8B7FFF 100%) !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  box-shadow: 0 4px 16px rgba(108, 99, 255, 0.25) !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+[data-dapp-kit] button:hover,
+[data-dapp-kit] [role="button"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(108, 99, 255, 0.35) !important;
+}
+
+[data-dapp-kit] button:active,
+[data-dapp-kit] [role="button"]:active {
+  transform: translateY(0) !important;
+}
+
+/* Connected wallet button */
+[data-dapp-kit] button[data-state="connected"],
+[data-dapp-kit] [aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #6C63FF !important;
+  border: 2px solid #6C63FF !important;
+  box-shadow: 0 4px 16px rgba(108, 99, 255, 0.15) !important;
+}
+
+[data-dapp-kit] button[data-state="connected"]:hover,
+[data-dapp-kit] [aria-expanded="true"]:hover {
+  background: white !important;
+  box-shadow: 0 8px 24px rgba(108, 99, 255, 0.25) !important;
+}
+
+/* Wallet dropdown menu */
+[data-dapp-kit] [role="menu"],
+[data-dapp-kit] [role="dialog"] {
+  background: white !important;
+  border: 2px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12) !important;
+  padding: 8px !important;
+  margin-top: 8px !important;
+}
+
+/* Wallet menu items */
+[data-dapp-kit] [role="menuitem"],
+[data-dapp-kit] [role="option"] {
+  background: transparent !important;
+  color: #1e293b !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+[data-dapp-kit] [role="menuitem"]:hover,
+[data-dapp-kit] [role="option"]:hover {
+  background: rgba(108, 99, 255, 0.08) !important;
+  color: #6C63FF !important;
+  transform: none !important;
+}
+
+/* Account switcher */
+[data-dapp-kit] [role="menuitem"][data-selected="true"],
+[data-dapp-kit] [role="option"][data-selected="true"] {
+  background: rgba(108, 99, 255, 0.12) !important;
+  color: #6C63FF !important;
+  font-weight: 600 !important;
+}
+
+/* Wallet icons in menu */
+[data-dapp-kit] img {
+  border-radius: 8px !important;
+}
+
+/* Disconnect button */
+[data-dapp-kit] button[data-variant="destructive"] {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: white !important;
+  border: none !important;
+}
+
+[data-dapp-kit] button[data-variant="destructive"]:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35) !important;
+}

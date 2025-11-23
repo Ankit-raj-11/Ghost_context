@@ -85,8 +85,16 @@ Answer${answerInstruction}:`;
     
     const answer = await this.llm.generate(prompt, onToken);
     
-    const totalTime = ((performance.now() - ragStartTime) / 1000).toFixed(2);
-    console.log(`✅ RAG Query complete (WeInfer) in ${totalTime}s`);
+    // Log system prompt and response
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📝 SYSTEM PROMPT:');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log("You are a helpful assistant. Answer the question based on the provided context.");
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🤖 LLM RESPONSE:');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(answer);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     return answer;
   }

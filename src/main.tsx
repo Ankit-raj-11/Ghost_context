@@ -24,7 +24,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-        <WalletProvider autoConnect={true} storageKey="ghostcontext-wallet">
+        <WalletProvider 
+          autoConnect={true} 
+          storageKey="ghostcontext-wallet"
+          enableUnsafeBurner={false}
+        >
           <App />
         </WalletProvider>
       </SuiClientProvider>

@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { Transaction, Inputs } from "@mysten/sui/transactions";
+import { Card, CardBody, CardFooter } from "./ui/Card";
+import { User, TrendingUp, ShoppingBag } from "lucide-react";
+import walrusIcon from "./assets/walrus.svg";
+import sealIcon from "./assets/seal.svg";
 import "./Marketplace.css";
 
 interface GhostContextNFT {
@@ -14,6 +18,8 @@ interface GhostContextNFT {
   version: string;
   isListed?: boolean;
   pricePerQuery?: string;
+  totalRevenue?: string;
+  totalQueriesSold?: string;
 }
 
 const Marketplace = () => {
@@ -21,6 +27,9 @@ const Marketplace = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [purchasing, setPurchasing] = useState<string | null>(null);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [selectedContext, setSelectedContext] = useState<GhostContextNFT | null>(null);
+  const [queryCount, setQueryCount] = useState("10");
   const currentAccount = useCurrentAccount();
   const suiClient = useSuiClient();
   const signAndExecuteTransaction = useSignAndExecuteTransaction({
@@ -34,7 +43,7 @@ const Marketplace = () => {
     loadMarketplace();
   }, []);
 
-  const handlePurchaseAccess = async (context: GhostContextNFT) => {
+  const openPurchaseModal = (context: GhostContextNFT) => {
     if (!currentAccount) {
       alert("Please connect your wallet first");
       return;
@@ -45,25 +54,32 @@ const Marketplace = () => {
       return;
     }
 
-    const queries = prompt("How many queries would you like to purchase?", "10");
-    if (!queries || isNaN(parseInt(queries))) return;
+    setSelectedContext(context);
+    setQueryCount("10");
+    setShowPurchaseModal(true);
+  };
 
-    const queryCount = parseInt(queries);
-    const pricePerQueryNum = parseInt(context.pricePerQuery || "0");
-    const totalCost = pricePerQueryNum * queryCount;
-    const totalPrice = totalCost / 1_000_000_000; // Convert MIST to SUI
+  const handlePurchaseAccess = async () => {
+    if (!selectedContext) return;
 
-    if (!confirm(`Purchase ${queryCount} queries for ${totalPrice.toFixed(4)} SUI?`)) {
+    const queries = parseInt(queryCount);
+    if (isNaN(queries) || queries <= 0) {
+      alert("Please enter a valid number of queries");
       return;
     }
 
+    const pricePerQueryNum = parseInt(selectedContext.pricePerQuery || "0");
+    const totalCost = pricePerQueryNum * queries;
+
+    setShowPurchaseModal(false);
+
     try {
-      setPurchasing(context.id);
-      console.log("🛒 Purchasing access to:", context.title);
+      setPurchasing(selectedContext.id);
+      console.log("🛒 Purchasing access to:", selectedContext.title);
 
       // Get registry shared version
       const registryObj = await suiClient.getObject({
-        id: registryObjectId,
+        id: registryObjectId!,
         options: { showOwner: true },
       });
       const registrySharedVersion = (registryObj.data?.owner as any)?.Shared?.initial_shared_version;
@@ -74,7 +90,7 @@ const Marketplace = () => {
 
       // Get fresh context object to get current shared version
       const contextObj = await suiClient.getObject({
-        id: context.id,
+        id: selectedContext.id,
         options: { showOwner: true },
       });
       
@@ -89,13 +105,13 @@ const Marketplace = () => {
       const tx = new Transaction();
       
       const contextArg = Inputs.SharedObjectRef({
-        objectId: context.id,
+        objectId: selectedContext.id,
         initialSharedVersion: contextSharedVersion,
         mutable: true,
       });
 
       const registryArg = Inputs.SharedObjectRef({
-        objectId: registryObjectId,
+        objectId: registryObjectId!,
         initialSharedVersion: registrySharedVersion,
         mutable: true,
       });
@@ -107,7 +123,7 @@ const Marketplace = () => {
         target: `${ghostContextPackageId}::ghostcontext::purchase_queries`,
         arguments: [
           tx.object(contextArg),
-          tx.pure.u64(queryCount),
+          tx.pure.u64(queries),
           coin,
           tx.object(registryArg),
         ],
@@ -119,7 +135,7 @@ const Marketplace = () => {
       });
 
       console.log("✅ Purchase successful:", response.digest);
-      alert(`Purchase successful! You now have ${queryCount} queries. Check your wallet for the QueryReceipt NFT with encryption keys.`);
+      alert(`Purchase successful! You now have ${queries} queries. Check your wallet for the QueryReceipt NFT with encryption keys.`);
       
       // Reload marketplace to update stats
       await loadMarketplace();
@@ -183,6 +199,8 @@ const Marketplace = () => {
               version: nftObject.data.version || "1",
               isListed: fields.is_listed,
               pricePerQuery: fields.price_per_query?.toString() || "0",
+              totalRevenue: fields.total_revenue?.toString() || "0",
+              totalQueriesSold: fields.total_queries_sold?.toString() || "0",
             };
           }
         } catch (error) {
@@ -209,40 +227,83 @@ const Marketplace = () => {
     ? contexts 
     : contexts.filter(c => c.category === filter);
 
+  // Generate random document tags based on context ID (deterministic)
+  const getDocumentTags = (contextId: string) => {
+    const allTags = [
+      "PDF", "Markdown", "Text", "JSON", "CSV", 
+      "Code", "API Docs", "Tutorial", "Guide", "Notes",
+      "Report", "Analysis", "Dataset", "Schema", "Config"
+    ];
+    
+    // Use context ID to generate deterministic random tags
+    const hash = contextId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const tagCount = 2 + (hash % 2); // 2-3 tags
+    const selectedTags: string[] = [];
+    
+    for (let i = 0; i < tagCount; i++) {
+      const index = (hash + i * 7) % allTags.length;
+      if (!selectedTags.includes(allTags[index])) {
+        selectedTags.push(allTags[index]);
+      }
+    }
+    
+    return selectedTags;
+  };
+
+  // Format price for display in MIST
+  const formatPriceInMist = (priceStr: string) => {
+    const mist = parseInt(priceStr);
+    return mist === 0 ? "1,000" : mist.toLocaleString();
+  };
+
+  // Format title
+  const formatTitle = (title: string) => {
+    return title.replace(/_/g, ' ');
+  };
+
   return (
     <div className="marketplace-container">
       <div className="page-container">
-        <div className="page-header">
-          <h1 className="page-title">🌐 GhostContext Marketplace</h1>
-          <p className="page-subtitle">Browse and access encrypted knowledge contexts</p>
-        </div>
-
       <div className="marketplace-content">
         <aside className="marketplace-sidebar">
-          <h3>Categories</h3>
-          <div className="category-filters">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                className={`category-btn ${filter === cat ? "active" : ""}`}
-                onClick={() => setFilter(cat)}
-              >
-                {cat}
-              </button>
-            ))}
+          <div className="sidebar-card">
+            <h3 className="sidebar-title">Categories</h3>
+            <div className="sidebar-menu">
+              {categories.map((cat) => {
+                const icons: Record<string, string> = {
+                  All: "M4 6h16M4 12h16M4 18h16",
+                  General: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
+                  Technical: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
+                  Research: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+                  Education: "M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z",
+                };
+                return (
+                  <button
+                    key={cat}
+                    className={`menu-item ${filter === cat ? "active" : ""}`}
+                    onClick={() => setFilter(cat)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d={icons[cat] || icons.General}></path>
+                    </svg>
+                    <span>{cat}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="marketplace-stats">
-            <h3>Stats</h3>
-            <div className="stat-item">
-              <span>Total Contexts</span>
-              <strong>{contexts.length}</strong>
+          {/* Powered By Section - Bottom */}
+          <div className="powered-by-section">
+            <div className="powered-by-text">Powered by</div>
+            <div className="powered-by-item">
+              <img src={walrusIcon} alt="Walrus" className="powered-by-icon" />
+              <span className="powered-by-name">WALRUS</span>
             </div>
-            <div className="stat-item">
-              <span>Your Contexts</span>
-              <strong>
-                {contexts.filter(c => c.owner === currentAccount?.address).length}
-              </strong>
+            <div className="powered-by-divider">and</div>
+            <div className="powered-by-item">
+              <img src={sealIcon} alt="SUI" className="powered-by-icon" />
+              <span className="powered-by-name">SUI</span>
             </div>
           </div>
         </aside>
@@ -263,84 +324,158 @@ const Marketplace = () => {
             </div>
           ) : (
             <div className="context-grid">
-              {filteredContexts.map((context) => (
-                <div key={context.id} className="context-card">
-                  <div className="context-header">
-                    <div className="context-badges">
-                      <span className="context-category">{context.category}</span>
-                      {context.owner === currentAccount?.address && (
-                        <span className="owner-badge">Your NFT</span>
-                      )}
-                      <span className={`status-badge-inline ${context.isListed ? "status-listed" : "status-unlisted"}`}>
-                        {context.isListed ? "● Listed" : "○ Unlisted"}
-                      </span>
-                    </div>
-                    <button className="context-bookmark" title="Bookmark">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <h3>{context.title}</h3>
-                  
-                  {context.isListed && context.pricePerQuery && (
-                    <div className="context-price-box">
-                      <span className="context-price-label">Price per Query</span>
-                      <span className="context-price-value">
-                        {(parseInt(context.pricePerQuery) / 1_000_000_000).toFixed(4)} SUI
-                      </span>
-                    </div>
-                  )}
-                  
-                  <div className="context-details">
-                    <div className="detail-row">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                      </svg>
-                      <span className="detail-label">Blob ID:</span>
-                      <span className="detail-value">
-                        <code>{context.walrusBlobId.substring(0, 16)}...</code>
-                      </span>
-                    </div>
-                    <div className="detail-row">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                      <span className="detail-label">Owner:</span>
-                      <span className="detail-value">
-                        <code>{context.owner.substring(0, 8)}...</code>
-                      </span>
-                    </div>
-                  </div>
+              {filteredContexts.map((context) => {
+                const isOwned = context.owner === currentAccount?.address;
+                const isListed = context.isListed && context.pricePerQuery;
+                
+                return (
+                  <Card key={context.id} className="marketplace-card" hover>
+                    <CardBody className="marketplace-card-body">
+                      {/* Title with Fixed Height */}
+                      <div className="title-section">
+                        <h3 className="card-title">{formatTitle(context.title)}</h3>
+                        <span className="category-tag">{context.category}</span>
+                      </div>
 
-                  <div className="context-actions">
-                    {context.owner === currentAccount?.address ? (
-                      <button className="btn-secondary" disabled>
-                        You Own This
-                      </button>
-                    ) : context.isListed && context.pricePerQuery ? (
-                      <button 
-                        className="btn-primary"
-                        onClick={() => handlePurchaseAccess(context)}
-                        disabled={purchasing === context.id}
-                      >
-                        {purchasing === context.id ? "Purchasing..." : "Purchase Access"}
-                      </button>
-                    ) : (
-                      <button className="btn-secondary" disabled>
-                        Not For Sale
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                      {/* Document Tags */}
+                      <div className="doc-tags">
+                        {getDocumentTags(context.id).map((tag, idx) => (
+                          <span key={idx} className="doc-tag">{tag}</span>
+                        ))}
+                      </div>
+
+                      {/* Price/Status Section */}
+                      {isListed ? (
+                        <div className="price-container">
+                          <div>
+                            <div className="price-row">
+                              <span className="price-value">{formatPriceInMist(context.pricePerQuery || "0")}</span>
+                              <span className="price-unit">MIST</span>
+                            </div>
+                            <span className="price-subtitle">per query</span>
+                          </div>
+                        </div>
+                      ) : isOwned ? (
+                        <div className="status-container">
+                          <span className="status-text">Vault</span>
+                        </div>
+                      ) : (
+                        <div className="status-container">
+                          <span className="status-text private">Private</span>
+                        </div>
+                      )}
+
+                      {/* Stats Row */}
+                      <div className="stats-row">
+                        <div className="stat-item">
+                          <ShoppingBag size={12} />
+                          <span className="stat-value">{context.totalQueriesSold || "0"}</span>
+                          <span className="stat-label">queries</span>
+                        </div>
+                        <div className="stat-divider"></div>
+                        <div className="stat-item">
+                          <TrendingUp size={12} />
+                          <span className="stat-value">{parseInt(context.totalRevenue || "0").toLocaleString()}</span>
+                          <span className="stat-label">MIST</span>
+                        </div>
+                      </div>
+
+                      {/* Owner with Icon */}
+                      <div className="owner-row">
+                        <User size={14} />
+                        <span className="owner-address">
+                          {context.owner.substring(0, 6)}...{context.owner.substring(context.owner.length - 4)}
+                        </span>
+                      </div>
+                    </CardBody>
+
+                    <CardFooter className="marketplace-card-footer">
+                      {isOwned ? (
+                        <button className="action-btn owned-btn" disabled>
+                          You Own This
+                        </button>
+                      ) : isListed ? (
+                        <button 
+                          className="action-btn purchase-btn"
+                          onClick={() => openPurchaseModal(context)}
+                          disabled={purchasing === context.id}
+                        >
+                          {purchasing === context.id ? "Purchasing..." : "Purchase"}
+                        </button>
+                      ) : (
+                        <button className="action-btn unavailable-btn" disabled>
+                          Not Available
+                        </button>
+                      )}
+                    </CardFooter>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </main>
       </div>
       </div>
+
+      {/* Purchase Modal */}
+      {showPurchaseModal && selectedContext && (
+        <div className="modal-overlay" onClick={() => setShowPurchaseModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Purchase Queries</h3>
+              <button className="modal-close" onClick={() => setShowPurchaseModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="modal-context-info">
+                <h4>{selectedContext.title}</h4>
+                <p className="modal-price">
+                  {formatPriceInMist(selectedContext.pricePerQuery || "0")} MIST per query
+                </p>
+              </div>
+
+              <div className="modal-input-group">
+                <label htmlFor="queryInput" className="modal-label">
+                  Number of Queries
+                </label>
+                <input
+                  id="queryInput"
+                  type="number"
+                  min="1"
+                  value={queryCount}
+                  onChange={(e) => setQueryCount(e.target.value)}
+                  className="modal-input"
+                  placeholder="Enter number of queries"
+                  autoFocus
+                />
+              </div>
+
+              <div className="modal-total">
+                <span>Total Cost:</span>
+                <span className="modal-total-value">
+                  {(parseInt(selectedContext.pricePerQuery || "0") * parseInt(queryCount || "0")).toLocaleString()} MIST
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="modal-btn modal-btn-secondary" 
+                onClick={() => setShowPurchaseModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-btn modal-btn-primary" 
+                onClick={handlePurchaseAccess}
+                disabled={!queryCount || parseInt(queryCount) <= 0}
+              >
+                Confirm Purchase
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
